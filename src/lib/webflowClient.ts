@@ -135,3 +135,81 @@ export async function getSiteLocales(siteId: string, token: string): Promise<Loc
     ...(locales.secondary ?? []).map((l) => toLocaleInfo(l, false)),
   ];
 }
+
+export interface WebflowCollection {
+  id: string;
+  slug: string;
+  displayName: string;
+}
+
+/**
+ * Reads a CMS collection's own metadata — notably its `slug`, the URL
+ * segment collection item pages are nested under (e.g. "blog"), needed to
+ * build an item's publishedPath since collection items don't carry their
+ * full public URL the way static pages do.
+ */
+export async function getCollection(collectionId: string, token: string): Promise<WebflowCollection> {
+  const res = await fetch(`https://api.webflow.com/v2/collections/${collectionId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "accept-version": "2.0.0",
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`Webflow get collection failed: ${res.status} ${await res.text()}`);
+  }
+  const json = await res.json<{ id: string; slug: string; displayName: string }>();
+  return { id: json.id, slug: json.slug, displayName: json.displayName };
+}
+
+export interface WebflowCollectionItem {
+  id: string;
+  slug: string;
+  name: string;
+  isDraft: boolean;
+  isArchived: boolean;
+  fieldData: Record<string, unknown>;
+}
+
+/**
+ * Fetches a single CMS collection item, optionally for a specific locale
+ * (mirrors listStaticPages's `localeId` — omit for the primary/default
+ * locale). Unlike the collection_item_published webhook payload (which only
+ * guarantees fieldData.name/slug), this returns the item's full fieldData,
+ * needed to read a site-specific summary field (see CmsCollectionConfig).
+ */
+export async function getCollectionItem(
+  collectionId: string,
+  itemId: string,
+  token: string,
+  cmsLocaleId?: string
+): Promise<WebflowCollectionItem | null> {
+  const localeParam = cmsLocaleId ? `?cmsLocaleId=${encodeURIComponent(cmsLocaleId)}` : "";
+  const res = await fetch(
+    `https://api.webflow.com/v2/collections/${collectionId}/items/${itemId}${localeParam}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "accept-version": "2.0.0",
+      },
+    }
+  );
+  if (res.status === 404) return null; // item doesn't exist in this locale
+  if (!res.ok) {
+    throw new Error(`Webflow get collection item failed: ${res.status} ${await res.text()}`);
+  }
+  const json = await res.json<{
+    id: string;
+    isDraft?: boolean;
+    isArchived?: boolean;
+    fieldData: { name: string; slug: string | null; [key: string]: unknown };
+  }>();
+  return {
+    id: json.id,
+    slug: json.fieldData.slug ?? "",
+    name: json.fieldData.name,
+    isDraft: json.isDraft ?? false,
+    isArchived: json.isArchived ?? false,
+    fieldData: json.fieldData,
+  };
+}

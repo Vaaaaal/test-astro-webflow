@@ -13,9 +13,16 @@ export interface LocalizedPageContent {
 }
 
 export interface PageEntry {
-  // partagé entre langues (ID de page Webflow) — lecture seule
+  // partagé entre langues (ID de page/item Webflow) — lecture seule
   id: string;
   lastPublishedAt: string; // ISO
+
+  // page statique ou item de collection CMS — détermine comment le webhook
+  // resynchronise cette entrée (re-liste complète vs upsert incrémental) et
+  // sert d'affichage dans l'admin. `collectionId` est non-null seulement si
+  // kind === "cms".
+  kind: "page" | "cms";
+  collectionId: string | null;
 
   // niveau page, pas par langue — éditable via PATCH /api/pages/:id
   category: Category | null;

@@ -27,15 +27,20 @@ async function hmacSha256Hex(secret: string, message: string): Promise<string> {
  * once at creation time in Site settings -> Webhooks — not a value we pick),
  * plus a 5-minute replay window on the timestamp.
  * https://developers.webflow.com/data/reference/request-signatures
+ *
+ * Accepts multiple candidate secrets because each webhook registered on
+ * Webflow (one per triggerType — site_publish, collection_item_published,
+ * ...) mints its own distinct secret; a request is valid if it matches ANY
+ * of them.
  */
 export async function verifyWebflowSignature(
   rawBody: string,
   timestampHeader: string | null,
   signatureHeader: string | null,
-  secret: string,
+  secrets: string[],
   now: number = Date.now()
 ): Promise<boolean> {
-  if (!timestampHeader || !signatureHeader || !secret) return false;
+  if (!timestampHeader || !signatureHeader || secrets.length === 0) return false;
 
   // Webflow's docs only check `now - timestamp > window` (too old); rejecting
   // the symmetric case (timestamp implausibly in the future) too is a strictly
@@ -44,6 +49,10 @@ export async function verifyWebflowSignature(
   const timestamp = Number(timestampHeader);
   if (!Number.isFinite(timestamp) || Math.abs(now - timestamp) > REPLAY_WINDOW_MS) return false;
 
-  const expected = await hmacSha256Hex(secret, `${timestampHeader}:${rawBody}`);
-  return timingSafeEqual(expected, signatureHeader);
+  for (const secret of secrets) {
+    if (!secret) continue;
+    const expected = await hmacSha256Hex(secret, `${timestampHeader}:${rawBody}`);
+    if (timingSafeEqual(expected, signatureHeader)) return true;
+  }
+  return false;
 }

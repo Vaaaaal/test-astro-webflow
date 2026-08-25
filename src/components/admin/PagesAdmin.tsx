@@ -108,6 +108,7 @@ export default function PagesAdmin({ base }: PagesAdminProps) {
         <TableHeader>
           <TableRow>
             <TableHead>Page</TableHead>
+            <TableHead>Type</TableHead>
             <TableHead>Titre</TableHead>
             <TableHead>Catégorie</TableHead>
             <TableHead>Dernière publication</TableHead>
@@ -121,6 +122,11 @@ export default function PagesAdmin({ base }: PagesAdminProps) {
             return (
               <TableRow key={page.id} className={page.visibleInSearch ? undefined : "opacity-60"}>
                 <TableCell className="max-w-64 truncate font-medium">{content?.publishedPath ?? ""}</TableCell>
+                <TableCell>
+                  <Badge variant={page.kind === "cms" ? "default" : "outline"}>
+                    {page.kind === "cms" ? "CMS" : "Page"}
+                  </Badge>
+                </TableCell>
                 <TableCell className="max-w-64 truncate">
                   {content?.title ?? (
                     <span className="text-muted-foreground">{content?.webflowTitle || "—"}</span>

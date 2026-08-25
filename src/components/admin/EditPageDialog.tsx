@@ -119,6 +119,9 @@ export function EditPageDialog({ entry, locales, base, onOpenChange, onSaved }: 
           <DialogTitle>{localeContent?.publishedPath ?? ""}</DialogTitle>
           <DialogDescription asChild>
             <div className="space-y-0.5 text-left">
+              {entry.kind === "cms" && (
+                <p>Item CMS — collection {entry.collectionId}</p>
+              )}
               <p>Titre Webflow : {localeContent?.webflowTitle || "—"}</p>
               <p>Meta-description Webflow : {localeContent?.webflowMetaDescription || "—"}</p>
               <p>Dernière publication : {new Date(entry.lastPublishedAt).toLocaleString()}</p>
