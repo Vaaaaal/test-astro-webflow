@@ -8,6 +8,7 @@ Ce repo est pensé comme un **template à cloner par site** : un déploiement (u
 
 - **Automatique** : `POST /api/webhooks/webflow` reçoit l'événement de publication Webflow (`site_publish`) et synchronise, pour chaque langue configurée sur le site, les champs techniques de chaque page (slug, titre SEO natif, meta-description) via l'API Webflow Data v2. Il ne crée/actualise que les champs techniques — jamais les champs éditoriaux.
 - **Manuel** : `/admin` liste les pages déjà connues et permet d'éditer, pour chacune, le titre et le résumé (par langue si le site est multilingue), la catégorie et la visibilité en recherche (ces deux derniers au niveau de la page, pas par langue). Aucune page ne peut être créée ou supprimée depuis cette interface — seul le webhook fait apparaître de nouvelles entrées.
+- **Public** : `GET /api/search-index` (pas d'authentification, CORS ouvert) renvoie les pages avec `visibleInSearch: true` uniquement, aplaties pour une langue donnée — c'est ce qu'un widget de recherche externe consomme. Paramètre `?locale=<tag>` optionnel (ex. `en-US`) ; sans lui, renvoie la langue primaire du site. Réponse : `[{ url, title, summary, category }]`, avec repli automatique titre/résumé sur les valeurs Webflow natives si pas de surcharge éditoriale, et libellé de catégorie déjà traduit pour la langue demandée.
 
 ## Multilingue
 
@@ -103,6 +104,7 @@ Puis ouvrir `http://localhost:4321/admin`.
 │   │   │   ├── users/         # GET/POST liste, PATCH/DELETE un utilisateur
 │   │   │   ├── pages/         # GET liste / PATCH une page (avec localeId)
 │   │   │   ├── locales/       # GET liste des langues du site
+│   │   │   ├── search-index/  # GET public, index de recherche pour le widget externe
 │   │   │   └── webhooks/
 │   │   │       └── webflow.ts # récepteur webhook Webflow
 │   │   └── index.astro        # redirige vers /admin
