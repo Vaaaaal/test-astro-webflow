@@ -26,7 +26,11 @@ declare namespace App {
 declare namespace Cloudflare {
   interface Env {
     WEBFLOW_API_TOKEN: string;
-    WEBHOOK_SHARED_SECRET: string;
+    // The per-webhook "Secret key" Webflow generates and shows once at
+    // webhook-creation time (Site settings -> Webhooks -> Add webhook) — not
+    // a value we choose ourselves. Used to verify the x-webflow-signature
+    // HMAC on incoming webhook requests (see webhooks/webflow.ts).
+    WEBFLOW_WEBHOOK_SECRET: string;
     RESEND_API_KEY: string;
     SUPER_ADMIN_EMAILS: string; // comma-separated, e.g. "a@x.com,b@x.com"
   }

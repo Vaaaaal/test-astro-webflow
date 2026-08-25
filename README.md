@@ -30,25 +30,14 @@ Envoi des emails via [Resend](https://resend.com).
 À faire à chaque nouveau clonage, avant le premier déploiement réel :
 
 1. **Renommer le Worker** — `wrangler.json` → `name` (actuellement `minisearch-admin`).
-2. **Créer et renommer le bucket R2** — `wrangler.json` → `r2_buckets[0].bucket_name` (actuellement `minisearch-pages`), puis :
-   ```
-   wrangler r2 bucket create <nom-du-bucket>
-   ```
-3. **Renseigner `WEBFLOW_SITE_ID`** dans `wrangler.json` (clé `vars`), l'ID du site Webflow ciblé.
-4. **Adapter les catégories** dans [`src/config/categories.ts`](src/config/categories.ts) — clés stables + libellé admin (une seule langue). Les traductions par langue (`CATEGORY_LOCALE_LABELS`) sont à compléter séparément, plus tard, quand le widget de recherche public existera. `DEFAULT_CATEGORY_RULES` assigne une catégorie de départ (toujours modifiable ensuite en admin) à une page selon un préfixe de son slug, testé sur chaque langue — `"*"` est le préfixe utilisé par défaut, à préciser par tag de locale (`"fr-FR"`, `"de-DE"`, ...) uniquement si un site traduit ses segments de dossier différemment selon la langue.
-5. **Créer un token API Webflow** (Site settings → Apps & Integrations → API access, lecture des pages) et définir les secrets (jamais commités) :
-   - En local, dans `.dev.vars` (gitignoré) :
-     ```
-     WEBFLOW_API_TOKEN=...
-     WEBHOOK_SHARED_SECRET=...
-     ```
-   - En production : `wrangler secret put WEBFLOW_API_TOKEN` / `wrangler secret put WEBHOOK_SHARED_SECRET` (ou l'équivalent via le dashboard Webflow Cloud si les secrets Worker n'y sont pas gérés en CLI directe — à vérifier selon la configuration du projet Cloud).
-6. **Enregistrer le webhook** côté Webflow (trigger `site_publish`) pointant vers `https://<ton-app>/api/webhooks/webflow`, avec un header `X-Webhook-Secret` égal à `WEBHOOK_SHARED_SECRET`.
-7. **Créer le namespace KV pour les liens de connexion** :
-   ```
-   wrangler kv namespace create AUTH_TOKENS
-   ```
-   Le binding `AUTH_TOKENS` dans `wrangler.json` n'a volontairement pas d'`id` (comme le binding `SESSION` d'Astro) — Wrangler le provisionne automatiquement au déploiement. Si `webflow cloud deploy` ne relaie pas cet auto-provisioning, créer le namespace manuellement avec la commande ci-dessus et ajouter l'`id` retourné dans `wrangler.json`.
+2. **Créer et renommer le bucket R2** — `wrangler.json` → `r2_buckets[0].bucket_name` (actuellement `minisearch-pages`). Sur Webflow Cloud, pas besoin de créer le bucket toi-même au préalable : il suffit de déclarer `binding`/`bucket_name` et de commit + push, Webflow Cloud le provisionne automatiquement au déploiement (confirmé — cf. dashboard "Storage quick start" → Object Storage). En Cloudflare Workers classique (hors Webflow Cloud), il faut le créer avant via `wrangler r2 bucket create <nom-du-bucket>`.
+3. **Créer le namespace KV pour les liens de connexion, AVANT le premier déploiement** — contrairement au bucket R2, un namespace KV doit déjà exister : son `id` est **obligatoire** dans `wrangler.json`, ce n'est pas auto-provisionné. Sur Webflow Cloud : dashboard → "Storage quick start" → Key-value store. En CLI (si accès direct au compte Cloudflare) : `wrangler kv namespace create AUTH_TOKENS`. Colle l'`id` obtenu dans `wrangler.json` → `kv_namespaces[0].id`, en remplaçant le placeholder `REPLACE_WITH_KV_NAMESPACE_ID`.
+
+   ⚠️ **Piège confirmé** : si `id` est absent ou invalide, le build Webflow Cloud échoue la validation de schéma de `wrangler.json` et **remplace silencieusement tout le fichier par un template générique** pour ce déploiement — le bucket R2, le KV, les `vars` custom disparaissent tous sans message d'erreur visible côté dashboard. Vérifier dans les logs de build la ligne `schema validation failed` / `copying wrangler template for astro` si un déploiement semble "ne rien connecter".
+4. **Renseigner `WEBFLOW_SITE_ID`** dans `wrangler.json` (clé `vars`), l'ID du site Webflow ciblé.
+5. **Adapter les catégories** dans [`src/config/categories.ts`](src/config/categories.ts) — clés stables + libellé admin (une seule langue). Les traductions par langue (`CATEGORY_LOCALE_LABELS`) sont à compléter séparément, plus tard, quand le widget de recherche public existera. `DEFAULT_CATEGORY_RULES` assigne une catégorie de départ (toujours modifiable ensuite en admin) à une page selon un préfixe de son slug, testé sur chaque langue — `"*"` est le préfixe utilisé par défaut, à préciser par tag de locale (`"fr-FR"`, `"de-DE"`, ...) uniquement si un site traduit ses segments de dossier différemment selon la langue.
+6. **Créer un token API Webflow** (Site settings → Apps & Integrations → API access, lecture des pages) et définir le secret `WEBFLOW_API_TOKEN` (jamais commité) — en local dans `.dev.vars`, en production via `wrangler secret put WEBFLOW_API_TOKEN` ou le dashboard Webflow Cloud.
+7. **Enregistrer le webhook côté Webflow** (Site settings → Webhooks → Add webhook, trigger `site_publish`) pointant vers `https://<ton-app>/api/webhooks/webflow` — seulement une fois l'app déployée et son URL connue. Webflow **génère lui-même** une clé de signature à la création (affichée une seule fois, à copier immédiatement) — ce n'est pas une valeur qu'on choisit. Colle cette clé dans le secret `WEBFLOW_WEBHOOK_SECRET` (même emplacement que `WEBFLOW_API_TOKEN` ci-dessus). Le webhook signe chaque requête (headers `x-webflow-signature` / `x-webflow-timestamp`, HMAC-SHA256) — c'est ce que `verifyWebflowSignature` (`src/lib/webhookSignature.ts`) vérifie ; les requêtes non signées ou mal signées sont rejetées en 401.
 8. **Configurer Resend** — vérifier un domaine d'envoi, renseigner `EMAIL_FROM_ADDRESS` dans `wrangler.json` (`vars`), et définir le secret `RESEND_API_KEY`.
 9. **Définir `SUPER_ADMIN_EMAILS`** (secret, liste d'emails séparés par des virgules) — amorce le tout premier accès super_admin.
 10. **(Optionnel) Adapter les seeds locaux** dans [`seed/pages.local.json`](seed/pages.local.json), [`seed/locales.local.json`](seed/locales.local.json) et [`seed/users.local.json`](seed/users.local.json) — servent uniquement à peupler le R2/KV simulés en dev, sans impact en production.

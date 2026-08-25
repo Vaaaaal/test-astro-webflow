@@ -4,6 +4,7 @@ import { writePagesDoc } from "../../../lib/pagesStore";
 import { writeLocalesDoc } from "../../../lib/localesStore";
 import { getSiteLocales, listStaticPages, type WebflowPageSeo } from "../../../lib/webflowClient";
 import { resolveDefaultCategory } from "../../../config/categories";
+import { verifyWebflowSignature } from "../../../lib/webhookSignature";
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -12,18 +13,27 @@ function json(status: number, body: unknown): Response {
   });
 }
 
-// TODO(security): Webflow's Data API v2 webhook delivery may support
-// cryptographic signature verification (HMAC over the raw request body,
-// keyed by a secret returned at webhook-registration time). Confirm the
-// current mechanism at https://developer.webflow.com/data/reference/webhooks
-// before relying solely on the shared-secret header check below.
 export const POST: APIRoute = async ({ request }) => {
-  const providedSecret = request.headers.get("X-Webhook-Secret");
-  if (!env.WEBHOOK_SHARED_SECRET || providedSecret !== env.WEBHOOK_SHARED_SECRET) {
+  // Must read the raw body text (not request.json()) — the signature is an
+  // HMAC over these exact bytes, and re-serializing a parsed object could
+  // produce a different string (key order, whitespace) that fails to match.
+  const rawBody = await request.text();
+  const validSignature = await verifyWebflowSignature(
+    rawBody,
+    request.headers.get("x-webflow-timestamp"),
+    request.headers.get("x-webflow-signature"),
+    env.WEBFLOW_WEBHOOK_SECRET
+  );
+  if (!validSignature) {
     return json(401, { error: "unauthorized" });
   }
 
-  const body = await request.json().catch(() => null);
+  let body: unknown;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return json(400, { error: "invalid_json" });
+  }
   if (!body || typeof body !== "object") {
     return json(400, { error: "invalid_json" });
   }
