@@ -20,6 +20,11 @@ interface WebflowPagesResponse {
     title?: string;
     draft?: boolean;
     archived?: boolean;
+    // Set on a collection page TEMPLATE (e.g. "Blog Posts Template"), not on
+    // real content — confirmed empirically against a real site. It has its
+    // own publishedPath (e.g. "/post"), but that's just the template's
+    // mount point, not a real page — skip it here.
+    collectionId?: string | null;
     seo?: { title?: string; description?: string };
   }>;
   pagination: { total: number; limit: number; offset: number };
@@ -55,7 +60,7 @@ export async function listStaticPages(
     }
     const json = await res.json<WebflowPagesResponse>();
     for (const page of json.pages) {
-      if (page.draft || page.archived) continue;
+      if (page.draft || page.archived || page.collectionId) continue;
       const slug = page.slug ?? "";
       results.push({
         id: page.id,
