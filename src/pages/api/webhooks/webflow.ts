@@ -53,9 +53,17 @@ export const POST: APIRoute = async ({ request }) => {
   try {
     locales = await getSiteLocales(env.WEBFLOW_SITE_ID, env.WEBFLOW_API_TOKEN);
     for (const locale of locales) {
+      // Per Webflow's docs, omitting localeId returns the primary locale's
+      // content — passing the primary's own id explicitly is not documented
+      // as equivalent, and empirically returned zero pages. Only pass
+      // localeId for actual secondary locales.
       pagesByLocale.set(
         locale.id,
-        await listStaticPages(env.WEBFLOW_SITE_ID, env.WEBFLOW_API_TOKEN, locale.id)
+        await listStaticPages(
+          env.WEBFLOW_SITE_ID,
+          env.WEBFLOW_API_TOKEN,
+          locale.isPrimary ? undefined : locale.id
+        )
       );
     }
   } catch (err) {
