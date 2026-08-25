@@ -11,7 +11,11 @@ export interface WebflowPageSeo {
 interface WebflowPagesResponse {
   pages: Array<{
     id: string;
-    slug: string;
+    // Webflow returns `null` (not "") for the site's home/root page —
+    // confirmed empirically. Normalized to "" below at the API boundary so
+    // nothing downstream (slug-prefix matching, category rules) has to
+    // handle null.
+    slug: string | null;
     publishedPath?: string;
     title?: string;
     draft?: boolean;
@@ -52,10 +56,11 @@ export async function listStaticPages(
     const json = await res.json<WebflowPagesResponse>();
     for (const page of json.pages) {
       if (page.draft || page.archived) continue;
+      const slug = page.slug ?? "";
       results.push({
         id: page.id,
-        slug: page.slug,
-        publishedPath: page.publishedPath ?? `/${page.slug}`,
+        slug,
+        publishedPath: page.publishedPath ?? `/${slug}`,
         webflowTitle: page.seo?.title ?? page.title ?? "",
         webflowMetaDescription: page.seo?.description ?? "",
       });

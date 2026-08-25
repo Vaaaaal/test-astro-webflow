@@ -81,44 +81,52 @@ export const POST: APIRoute = async ({ request }) => {
     for (const p of pages) pageIds.add(p.id);
   }
 
-  const doc = await writePagesDoc(env.PAGES_BUCKET, (doc) => {
-    for (const pageId of pageIds) {
-      let entry = doc.pages.find((p) => p.id === pageId);
-      if (!entry) {
-        const slugsByLocale = locales
-          .map((locale) => {
-            const slug = pagesByLocale.get(locale.id)?.find((p) => p.id === pageId)?.slug;
-            return slug !== undefined ? { localeTag: locale.tag, slug } : null;
-          })
-          .filter((x): x is { localeTag: string; slug: string } => x !== null);
-        entry = {
-          id: pageId,
-          lastPublishedAt: now,
-          category: resolveDefaultCategory(slugsByLocale),
-          visibleInSearch: true,
-          locales: {},
-        };
-        doc.pages.push(entry);
-      } else {
-        entry.lastPublishedAt = now;
-      }
+  let doc;
+  try {
+    doc = await writePagesDoc(env.PAGES_BUCKET, (doc) => {
+      for (const pageId of pageIds) {
+        let entry = doc.pages.find((p) => p.id === pageId);
+        if (!entry) {
+          const slugsByLocale = locales
+            .map((locale) => {
+              const slug = pagesByLocale.get(locale.id)?.find((p) => p.id === pageId)?.slug;
+              return slug !== undefined ? { localeTag: locale.tag, slug } : null;
+            })
+            .filter((x): x is { localeTag: string; slug: string } => x !== null);
+          entry = {
+            id: pageId,
+            lastPublishedAt: now,
+            category: resolveDefaultCategory(slugsByLocale),
+            visibleInSearch: true,
+            locales: {},
+          };
+          doc.pages.push(entry);
+        } else {
+          entry.lastPublishedAt = now;
+        }
 
-      for (const locale of locales) {
-        const wfPage = pagesByLocale.get(locale.id)?.find((p) => p.id === pageId);
-        if (!wfPage) continue; // page not present in this locale's list
-        const existing = entry.locales[locale.id];
-        entry.locales[locale.id] = {
-          slug: wfPage.slug,
-          publishedPath: wfPage.publishedPath,
-          webflowTitle: wfPage.webflowTitle,
-          webflowMetaDescription: wfPage.webflowMetaDescription,
-          title: existing?.title ?? null,
-          summary: existing?.summary ?? null,
-        };
+        for (const locale of locales) {
+          const wfPage = pagesByLocale.get(locale.id)?.find((p) => p.id === pageId);
+          if (!wfPage) continue; // page not present in this locale's list
+          const existing = entry.locales[locale.id];
+          entry.locales[locale.id] = {
+            slug: wfPage.slug,
+            publishedPath: wfPage.publishedPath,
+            webflowTitle: wfPage.webflowTitle,
+            webflowMetaDescription: wfPage.webflowMetaDescription,
+            title: existing?.title ?? null,
+            summary: existing?.summary ?? null,
+          };
+        }
       }
-    }
-    return doc;
-  });
+      return doc;
+    });
+  } catch (err) {
+    return json(500, {
+      error: "pages_write_failed",
+      detail: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   return json(200, {
     ok: true,
