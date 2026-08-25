@@ -5,7 +5,7 @@ import { writeLocalesDoc, readLocalesDoc, type LocaleInfo } from "../../../lib/l
 import {
   getSiteLocales,
   listStaticPages,
-  getCollection,
+  getCollectionPagePath,
   getCollectionItem,
   type WebflowPageSeo,
   type WebflowCollectionItem,
@@ -137,19 +137,18 @@ async function handleCollectionItemPublished(
   const localesDoc = await readLocalesDoc(env.PAGES_BUCKET);
   const locales: LocaleInfo[] = localesDoc.locales;
 
-  let collection;
   const itemsByLocale = new Map<string, WebflowCollectionItem | null>();
+  const templatePathByLocale = new Map<string, string | null>();
   try {
-    collection = await getCollection(collectionId, env.WEBFLOW_API_TOKEN);
     for (const locale of locales) {
+      const localeId = locale.isPrimary ? undefined : locale.id;
       itemsByLocale.set(
         locale.id,
-        await getCollectionItem(
-          collectionId,
-          itemId,
-          env.WEBFLOW_API_TOKEN,
-          locale.isPrimary ? undefined : locale.id
-        )
+        await getCollectionItem(collectionId, itemId, env.WEBFLOW_API_TOKEN, localeId)
+      );
+      templatePathByLocale.set(
+        locale.id,
+        await getCollectionPagePath(env.WEBFLOW_SITE_ID, collectionId, env.WEBFLOW_API_TOKEN, localeId)
       );
     }
   } catch (err) {
@@ -160,11 +159,16 @@ async function handleCollectionItemPublished(
   }
 
   // The item may be live in some locales and not yet translated/published in
-  // others. If it isn't live anywhere, treat this the same as an unpublish.
-  const isLiveSomewhere = [...itemsByLocale.values()].some(
-    (item) => item && !item.isDraft && !item.isArchived
-  );
-  if (!isLiveSomewhere) {
+  // others, and a locale's Collection Page template may not exist yet (see
+  // getCollectionPagePath) — an item only counts as linkable if both are
+  // true for at least one locale. If not, there's nothing to point search
+  // results at, so treat this the same as an unpublish rather than writing
+  // an entry with no usable content in any locale.
+  const isLinkableSomewhere = locales.some((locale) => {
+    const item = itemsByLocale.get(locale.id);
+    return item && !item.isDraft && !item.isArchived && templatePathByLocale.get(locale.id);
+  });
+  if (!isLinkableSomewhere) {
     return handleCollectionItemRemoved(itemId);
   }
 
@@ -191,14 +195,18 @@ async function handleCollectionItemPublished(
       for (const locale of locales) {
         const item = itemsByLocale.get(locale.id);
         if (!item || item.isDraft || item.isArchived) continue;
+        // No page template synced for this collection/locale yet (e.g. the
+        // Collection Page was never actually built out in the Designer) —
+        // nothing to link to, skip rather than write a broken URL.
+        const templatePath = templatePathByLocale.get(locale.id);
+        if (!templatePath) continue;
         const existing = entry.locales[locale.id];
         const summary = cmsConfig.summaryField
           ? String(item.fieldData[cmsConfig.summaryField] ?? "")
           : "";
-        const subdirectoryPrefix = locale.subdirectory ? `/${locale.subdirectory}` : "";
         entry.locales[locale.id] = {
           slug: item.slug,
-          publishedPath: `${subdirectoryPrefix}/${collection.slug}/${item.slug}`,
+          publishedPath: `${templatePath}/${item.slug}`,
           webflowTitle: item.name,
           webflowMetaDescription: summary,
           title: existing?.title ?? null,

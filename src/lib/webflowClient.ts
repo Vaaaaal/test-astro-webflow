@@ -141,30 +141,48 @@ export async function getSiteLocales(siteId: string, token: string): Promise<Loc
   ];
 }
 
-export interface WebflowCollection {
-  id: string;
-  slug: string;
-  displayName: string;
-}
-
 /**
- * Reads a CMS collection's own metadata — notably its `slug`, the URL
- * segment collection item pages are nested under (e.g. "blog"), needed to
- * build an item's publishedPath since collection items don't carry their
- * full public URL the way static pages do.
+ * Finds the URL prefix live collection items are served under, by locating
+ * the collection's page TEMPLATE among the site's pages and reading its own
+ * `publishedPath` (e.g. "/post") — Webflow's own computed value, confirmed
+ * against a real site to be the right prefix, unlike reconstructing one
+ * from the collection's own `slug` field (which happened to match in that
+ * one test but isn't a documented guarantee). Pass `localeId` the same way
+ * as `listStaticPages` — the template's own publishedPath is itself
+ * locale-prefixed for secondary locales, mirroring regular pages. Returns
+ * null if the collection has no page template synced yet (e.g. draft, or
+ * never actually built out in the Designer).
  */
-export async function getCollection(collectionId: string, token: string): Promise<WebflowCollection> {
-  const res = await fetch(`https://api.webflow.com/v2/collections/${collectionId}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "accept-version": "2.0.0",
-    },
-  });
-  if (!res.ok) {
-    throw new Error(`Webflow get collection failed: ${res.status} ${await res.text()}`);
+export async function getCollectionPagePath(
+  siteId: string,
+  collectionId: string,
+  token: string,
+  localeId?: string
+): Promise<string | null> {
+  const limit = 100;
+  let offset = 0;
+  const localeParam = localeId ? `&localeId=${encodeURIComponent(localeId)}` : "";
+
+  while (true) {
+    const res = await fetch(
+      `https://api.webflow.com/v2/sites/${siteId}/pages?limit=${limit}&offset=${offset}${localeParam}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "accept-version": "2.0.0",
+        },
+      }
+    );
+    if (!res.ok) {
+      throw new Error(`Webflow pages list failed: ${res.status} ${await res.text()}`);
+    }
+    const json = await res.json<WebflowPagesResponse>();
+    const match = json.pages.find((p) => p.collectionId === collectionId);
+    if (match) return match.publishedPath ?? null;
+    offset += limit;
+    if (offset >= json.pagination.total) break;
   }
-  const json = await res.json<{ id: string; slug: string; displayName: string }>();
-  return { id: json.id, slug: json.slug, displayName: json.displayName };
+  return null;
 }
 
 export interface WebflowCollectionItem {
