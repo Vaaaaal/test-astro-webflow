@@ -16,18 +16,14 @@
       "bucket_name": "minisearch-pages"
     }
   ],
-  // AUTH_TOKENS requires a real `id` before the first deploy — Webflow
-  // Cloud's build validates wrangler.json against a strict schema and, if
-  // `id` is missing, silently discards this whole file and substitutes a
-  // generic template (so none of these bindings/vars get wired up, with no
-  // obvious error). Create the namespace first (Webflow Cloud dashboard ->
-  // Storage quick start -> Key-value store, or `wrangler kv namespace
-  // create AUTH_TOKENS` if you have direct Cloudflare account access) and
-  // paste the id below before your first push.
   "kv_namespaces": [
     {
       "binding": "AUTH_TOKENS",
-      "id": "REPLACE_WITH_KV_NAMESPACE_ID"
+      "id": "minisearch-auth-tokens"
+    },
+    {
+      "binding": "SESSION",
+      "id": "minisearch-session"
     }
   ],
   "vars": {
