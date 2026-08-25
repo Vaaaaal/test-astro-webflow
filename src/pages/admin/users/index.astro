@@ -1,0 +1,18 @@
+---
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import UsersAdmin from "../../../components/admin/UsersAdmin";
+
+const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "") || "";
+// Guaranteed by middleware (role >= admin) for anyone reaching this page.
+const currentUser = Astro.locals.user!;
+---
+
+<AdminLayout>
+  <main class="mx-auto w-full max-w-4xl px-4 py-10">
+    <h1 class="mb-1 text-2xl font-semibold">Utilisateurs</h1>
+    <p class="mb-8 text-sm text-muted-foreground">
+      Gère qui peut se connecter et éditer le contenu de recherche.
+    </p>
+    <UsersAdmin client:load base={base} currentUserEmail={currentUser.email} currentUserRole={currentUser.role} />
+  </main>
+</AdminLayout>

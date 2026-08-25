@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "astro",
+  "name": "minisearch-admin",
   "compatibility_date": "2025-04-15",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
@@ -9,5 +9,20 @@
   },
   "observability": {
     "enabled": true
+  },
+  "r2_buckets": [
+    {
+      "binding": "PAGES_BUCKET",
+      "bucket_name": "minisearch-pages"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "AUTH_TOKENS"
+    }
+  ],
+  "vars": {
+    "WEBFLOW_SITE_ID": "",
+    "EMAIL_FROM_ADDRESS": ""
   }
 }

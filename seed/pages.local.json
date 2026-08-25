@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-08-24T00:00:00.000Z",
+  "pages": [
+    {
+      "id": "seed-home",
+      "lastPublishedAt": "2026-08-20T09:00:00.000Z",
+      "category": "plateformes",
+      "visibleInSearch": true,
+      "locales": {
+        "locale-fr": {
+          "slug": "",
+          "publishedPath": "/",
+          "webflowTitle": "Accueil | Exemple",
+          "webflowMetaDescription": "Page d'accueil du site exemple.",
+          "title": "Accueil",
+          "summary": "Page d'accueil présentant l'offre principale."
+        },
+        "locale-en": {
+          "slug": "",
+          "publishedPath": "/en",
+          "webflowTitle": "Home | Example",
+          "webflowMetaDescription": "Home page of the example site.",
+          "title": "Home",
+          "summary": "Home page presenting the main offer."
+        }
+      }
+    },
+    {
+      "id": "seed-blog-post",
+      "lastPublishedAt": "2026-08-21T14:30:00.000Z",
+      "category": "blog",
+      "visibleInSearch": true,
+      "locales": {
+        "locale-fr": {
+          "slug": "blog/exemple-article",
+          "publishedPath": "/blog/exemple-article",
+          "webflowTitle": "Exemple d'article | Blog",
+          "webflowMetaDescription": "Un article de blog d'exemple pour tester la recherche.",
+          "title": null,
+          "summary": null
+        },
+        "locale-en": {
+          "slug": "blog/example-article",
+          "publishedPath": "/en/blog/example-article",
+          "webflowTitle": "Example article | Blog",
+          "webflowMetaDescription": "An example blog article to test search.",
+          "title": null,
+          "summary": null
+        }
+      }
+    },
+    {
+      "id": "seed-docs",
+      "lastPublishedAt": "2026-08-22T11:15:00.000Z",
+      "category": "documentation",
+      "visibleInSearch": false,
+      "locales": {
+        "locale-fr": {
+          "slug": "documentation/getting-started",
+          "publishedPath": "/documentation/getting-started",
+          "webflowTitle": "Getting started | Documentation",
+          "webflowMetaDescription": "Guide de démarrage rapide.",
+          "title": "Bien démarrer",
+          "summary": null
+        },
+        "locale-en": {
+          "slug": "documentation/getting-started",
+          "publishedPath": "/en/documentation/getting-started",
+          "webflowTitle": "Getting started | Documentation",
+          "webflowMetaDescription": "Quick start guide.",
+          "title": null,
+          "summary": null
+        }
+      }
+    }
+  ]
+}

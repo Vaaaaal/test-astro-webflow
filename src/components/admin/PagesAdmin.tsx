@@ -1,0 +1,172 @@
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import type { PageEntry } from "@/lib/pagesStore";
+import type { LocaleInfo } from "@/lib/localesStore";
+import { CATEGORY_ADMIN_LABELS } from "@/config/categories";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { EditPageDialog } from "./EditPageDialog";
+
+interface PagesAdminProps {
+  base: string;
+}
+
+export default function PagesAdmin({ base }: PagesAdminProps) {
+  const [pages, setPages] = useState<PageEntry[] | null>(null);
+  const [locales, setLocales] = useState<LocaleInfo[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  function loadPages() {
+    setError(null);
+    Promise.all([
+      fetch(`${base}/api/pages`).then((res) => {
+        if (!res.ok) throw new Error(`GET /api/pages failed: ${res.status}`);
+        return res.json() as Promise<PageEntry[]>;
+      }),
+      fetch(`${base}/api/locales`).then((res) => {
+        if (!res.ok) throw new Error(`GET /api/locales failed: ${res.status}`);
+        return res.json() as Promise<LocaleInfo[]>;
+      }),
+    ])
+      .then(([pagesData, localesData]) => {
+        setPages(pagesData);
+        setLocales(localesData);
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+        toast.error("Impossible de charger les pages", { description: message });
+      });
+  }
+
+  useEffect(loadPages, [base]);
+
+  const primaryLocale = locales.find((l) => l.isPrimary) ?? locales[0];
+
+  function handleSaved(updated: PageEntry) {
+    setPages((prev) => prev?.map((p) => (p.id === updated.id ? updated : p)) ?? prev);
+  }
+
+  async function handleToggleVisible(page: PageEntry, next: boolean) {
+    handleSaved({ ...page, visibleInSearch: next }); // optimistic
+    try {
+      const res = await fetch(`${base}/api/pages/${page.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visibleInSearch: next }),
+      });
+      const data = (await res.json()) as { error?: string; entry?: PageEntry };
+      if (!res.ok) throw new Error(data?.error ?? `Échec (${res.status})`);
+      handleSaved(data.entry as PageEntry);
+    } catch (err) {
+      handleSaved(page); // revert on failure
+      toast.error("Échec de la mise à jour de la visibilité", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  if (error && pages === null) {
+    return (
+      <div className="flex items-center justify-between rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+        <span>Impossible de charger les pages.</span>
+        <Button variant="outline" size="sm" onClick={loadPages}>
+          Réessayer
+        </Button>
+      </div>
+    );
+  }
+
+  if (pages === null) {
+    return <p className="text-sm text-muted-foreground">Chargement…</p>;
+  }
+
+  if (pages.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Aucune page pour l'instant. Les pages apparaissent ici automatiquement après une
+        publication Webflow.
+      </p>
+    );
+  }
+
+  const editingEntry = pages.find((p) => p.id === editingId) ?? null;
+
+  return (
+    <div className="overflow-x-auto rounded-lg border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Page</TableHead>
+            <TableHead>Titre</TableHead>
+            <TableHead>Catégorie</TableHead>
+            <TableHead>Dernière publication</TableHead>
+            <TableHead>Visible</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {pages.map((page) => {
+            const content = primaryLocale ? page.locales[primaryLocale.id] : undefined;
+            return (
+              <TableRow key={page.id} className={page.visibleInSearch ? undefined : "opacity-60"}>
+                <TableCell className="max-w-64 truncate font-medium">{content?.publishedPath ?? ""}</TableCell>
+                <TableCell className="max-w-64 truncate">
+                  {content?.title ?? (
+                    <span className="text-muted-foreground">{content?.webflowTitle || "—"}</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {page.category ? (
+                    <Badge variant="secondary">{CATEGORY_ADMIN_LABELS[page.category]}</Badge>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {new Date(page.lastPublishedAt).toLocaleDateString()}
+                </TableCell>
+                <TableCell>
+                  <Switch
+                    checked={page.visibleInSearch}
+                    onCheckedChange={(checked) => handleToggleVisible(page, checked)}
+                    aria-label={
+                      page.visibleInSearch
+                        ? "Masquer cette page des résultats de recherche"
+                        : "Afficher cette page dans les résultats de recherche"
+                    }
+                  />
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button variant="outline" size="sm" onClick={() => setEditingId(page.id)}>
+                    Modifier
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+
+      <EditPageDialog
+        entry={editingEntry}
+        locales={locales}
+        base={base}
+        onOpenChange={(open) => {
+          if (!open) setEditingId(null);
+        }}
+        onSaved={handleSaved}
+      />
+    </div>
+  );
+}

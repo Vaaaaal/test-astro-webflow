@@ -1,0 +1,18 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import LoginForm from "../../components/auth/LoginForm";
+
+const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "") || "";
+
+if (Astro.locals.user) {
+  return Astro.redirect(`${base}/admin`);
+}
+
+const verifyError = Astro.url.searchParams.get("error") ?? undefined;
+---
+
+<Layout>
+  <main class="mx-auto flex min-h-screen max-w-sm items-center px-4">
+    <LoginForm client:load base={base} verifyError={verifyError} />
+  </main>
+</Layout>

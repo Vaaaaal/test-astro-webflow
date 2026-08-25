@@ -4,16 +4,14 @@ import cloudflare from "@astrojs/cloudflare";
 
 import react from '@astrojs/react';
 
+import tailwindcss from "@tailwindcss/vite";
+
 // https://astro.build/config
 export default defineConfig({
   base: "CLOUD_MOUNT_PATH",
   output: "server",
   compressHTML: true,
-  adapter: cloudflare({
-    platformProxy: {
-      enabled: true
-    }
-  }),
+  adapter: cloudflare(),
 
   integrations: [react()],
   vite: {
@@ -24,5 +22,7 @@ export default defineConfig({
         "react-dom/server": "react-dom/server.edge",
       } : undefined,
     },
-}
+
+    plugins: [tailwindcss()]
+  }
 });

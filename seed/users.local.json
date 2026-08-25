@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-08-24T00:00:00.000Z",
+  "users": [
+    {
+      "email": "editor@example.com",
+      "role": "editor",
+      "addedBy": "seed",
+      "createdAt": "2026-08-24T00:00:00.000Z"
+    },
+    {
+      "email": "admin@example.com",
+      "role": "admin",
+      "addedBy": "seed",
+      "createdAt": "2026-08-24T00:00:00.000Z"
+    }
+  ]
+}
