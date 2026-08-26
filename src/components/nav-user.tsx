@@ -3,6 +3,7 @@ import {
   Avatar,
   AvatarFallback,
 } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,9 +18,10 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import type { Role } from "@/config/roles";
 import { ChevronsUpDownIcon, LogOutIcon } from "lucide-react";
 
-export function NavUser({ base, email }: { base: string; email: string }) {
+export function NavUser({ base, email, role }: { base: string; email: string; role: Role }) {
   const { isMobile } = useSidebar();
   const logoutFormRef = useRef<HTMLFormElement>(null);
   const initial = email.charAt(0).toUpperCase();
@@ -41,6 +43,7 @@ export function NavUser({ base, email }: { base: string; email: string }) {
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{email}</span>
+                <span className="truncate text-xs text-sidebar-foreground/60">{role}</span>
               </div>
               <ChevronsUpDownIcon className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -58,6 +61,9 @@ export function NavUser({ base, email }: { base: string; email: string }) {
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{email}</span>
+                  <Badge variant="outline" className="mt-0.5 w-fit text-[10px]">
+                    {role}
+                  </Badge>
                 </div>
               </div>
             </DropdownMenuLabel>

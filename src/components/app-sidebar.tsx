@@ -1,5 +1,4 @@
 import * as React from "react";
-import { TerminalIcon } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
@@ -12,7 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { ADMIN_NAV_ITEMS } from "@/config/adminNav";
+import { ADMIN_NAV_GROUPS } from "@/config/adminNav";
 import { roleAtLeast, type Role } from "@/config/roles";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -22,13 +21,12 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 }
 
 export function AppSidebar({ base, currentPath, user, ...props }: AppSidebarProps) {
-  const navMain = ADMIN_NAV_ITEMS.filter(
-    (item) => !item.minRole || roleAtLeast(user.role, item.minRole)
-  ).map((item) => ({
-    title: item.title,
-    url: `${base}${item.path}`,
-    icon: <item.icon />,
-  }));
+  const navGroups = ADMIN_NAV_GROUPS.map((group) => ({
+    label: group.label,
+    items: group.items
+      .filter((item) => !item.minRole || roleAtLeast(user.role, item.minRole))
+      .map((item) => ({ title: item.title, url: `${base}${item.path}`, icon: <item.icon /> })),
+  })).filter((group) => group.items.length > 0);
 
   return (
     <Sidebar variant="inset" {...props}>
@@ -37,9 +35,7 @@ export function AppSidebar({ base, currentPath, user, ...props }: AppSidebarProp
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <a href={`${base}/admin`}>
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <TerminalIcon className="size-4" />
-                </div>
+                <img src={`${base}/logo.svg`} alt="" className="size-8 shrink-0 rounded-lg" />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">Minisearch</span>
                   <span className="truncate text-xs">Admin</span>
@@ -50,10 +46,12 @@ export function AppSidebar({ base, currentPath, user, ...props }: AppSidebarProp
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navMain} currentPath={currentPath} />
+        {navGroups.map((group) => (
+          <NavMain key={group.label} label={group.label} items={group.items} currentPath={currentPath} />
+        ))}
       </SidebarContent>
       <SidebarFooter>
-        <NavUser base={base} email={user.email} />
+        <NavUser base={base} email={user.email} role={user.role} />
       </SidebarFooter>
     </Sidebar>
   );

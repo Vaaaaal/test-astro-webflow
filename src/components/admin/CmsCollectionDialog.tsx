@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ResetButton } from "./ResetButton";
 
 interface WebflowCollectionWithFields {
   id: string;
@@ -108,7 +109,10 @@ export function CmsCollectionDialog({
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid gap-1.5">
-            <Label htmlFor="cms-summary-field">Champ résumé (optionnel)</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="cms-summary-field">Champ résumé (optionnel)</Label>
+              <ResetButton onClick={() => setSummaryField("")} />
+            </div>
             <Select value={summaryField} onValueChange={setSummaryField}>
               <SelectTrigger id="cms-summary-field" className="w-full">
                 <SelectValue placeholder="— aucun —" />
@@ -127,7 +131,10 @@ export function CmsCollectionDialog({
             </p>
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="cms-default-category">Catégorie par défaut (optionnel)</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="cms-default-category">Catégorie par défaut (optionnel)</Label>
+              <ResetButton onClick={() => setDefaultCategory("")} />
+            </div>
             <Select value={defaultCategory} onValueChange={setDefaultCategory}>
               <SelectTrigger id="cms-default-category" className="w-full">
                 <SelectValue placeholder="— aucune —" />

@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ResetButton } from "./ResetButton";
 
 interface EditPageDialogProps {
   entry: PageEntry | null;
@@ -43,18 +44,6 @@ interface LocaleFormState {
 
 const PAGE_LEVEL_FIELDS = CUSTOM_FIELDS.filter((f) => !f.perLocale);
 const PER_LOCALE_FIELDS = CUSTOM_FIELDS.filter((f) => f.perLocale);
-
-function ResetButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-      onClick={onClick}
-    >
-      Réinitialiser
-    </button>
-  );
-}
 
 export function EditPageDialog({
   entry,
