@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { PageEntry } from "@/lib/pagesStore";
 import type { LocaleInfo } from "@/lib/localesStore";
-import { CATEGORIES, CATEGORY_ADMIN_LABELS, type Category } from "@/config/categories";
+import type { CategoryEntry } from "@/lib/categoriesStore";
+import { CUSTOM_FIELDS } from "@/config/customFields";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,6 +28,7 @@ import {
 interface EditPageDialogProps {
   entry: PageEntry | null;
   locales: LocaleInfo[];
+  categories: CategoryEntry[];
   base: string;
   onOpenChange: (open: boolean) => void;
   onSaved: (updated: PageEntry) => void;
@@ -36,13 +38,37 @@ type SaveState = "idle" | "saving";
 interface LocaleFormState {
   title: string;
   summary: string;
+  customFields: Record<string, string>;
 }
 
-export function EditPageDialog({ entry, locales, base, onOpenChange, onSaved }: EditPageDialogProps) {
+const PAGE_LEVEL_FIELDS = CUSTOM_FIELDS.filter((f) => !f.perLocale);
+const PER_LOCALE_FIELDS = CUSTOM_FIELDS.filter((f) => f.perLocale);
+
+function ResetButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+      onClick={onClick}
+    >
+      Réinitialiser
+    </button>
+  );
+}
+
+export function EditPageDialog({
+  entry,
+  locales,
+  categories,
+  base,
+  onOpenChange,
+  onSaved,
+}: EditPageDialogProps) {
   const [selectedLocaleId, setSelectedLocaleId] = useState("");
   const [localeEdits, setLocaleEdits] = useState<Record<string, LocaleFormState>>({});
-  const [category, setCategory] = useState<Category | "">("");
+  const [category, setCategory] = useState<string>("");
   const [visibleInSearch, setVisibleInSearch] = useState(true);
+  const [pageCustomFields, setPageCustomFields] = useState<Record<string, string>>({});
   const [saveState, setSaveState] = useState<SaveState>("idle");
 
   // Only re-initialize form state when a *different* entry is opened for
@@ -60,24 +86,40 @@ export function EditPageDialog({ entry, locales, base, onOpenChange, onSaved }: 
 
     const edits: Record<string, LocaleFormState> = {};
     for (const [localeId, content] of Object.entries(entry.locales)) {
-      edits[localeId] = { title: content.title ?? "", summary: content.summary ?? "" };
+      edits[localeId] = {
+        title: content.title ?? "",
+        summary: content.summary ?? "",
+        customFields: { ...content.customFields },
+      };
     }
     setLocaleEdits(edits);
     const primaryLocaleId = locales.find((l) => l.isPrimary)?.id;
     setSelectedLocaleId(primaryLocaleId ?? Object.keys(entry.locales)[0] ?? "");
     setCategory(entry.category ?? "");
     setVisibleInSearch(entry.visibleInSearch);
+    setPageCustomFields({ ...entry.customFields });
     setSaveState("idle");
   }, [entry, locales]);
 
   const localeContent = entry?.locales[selectedLocaleId];
-  const form = localeEdits[selectedLocaleId] ?? { title: "", summary: "" };
+  const emptyForm: LocaleFormState = { title: "", summary: "", customFields: {} };
+  const form = localeEdits[selectedLocaleId] ?? emptyForm;
 
-  function updateForm(patch: Partial<LocaleFormState>) {
+  function updateForm(patch: Partial<Omit<LocaleFormState, "customFields">>) {
     setLocaleEdits((prev) => ({
       ...prev,
-      [selectedLocaleId]: { ...(prev[selectedLocaleId] ?? { title: "", summary: "" }), ...patch },
+      [selectedLocaleId]: { ...(prev[selectedLocaleId] ?? emptyForm), ...patch },
     }));
+  }
+
+  function updateLocaleCustomField(key: string, value: string) {
+    setLocaleEdits((prev) => {
+      const current = prev[selectedLocaleId] ?? emptyForm;
+      return {
+        ...prev,
+        [selectedLocaleId]: { ...current, customFields: { ...current.customFields, [key]: value } },
+      };
+    });
   }
 
   async function handleSave() {
@@ -93,6 +135,7 @@ export function EditPageDialog({ entry, locales, base, onOpenChange, onSaved }: 
           summary: form.summary || null,
           category: category || null,
           visibleInSearch,
+          customFields: { ...pageCustomFields, ...form.customFields },
         }),
       });
       const data = (await res.json()) as { error?: string; entry?: PageEntry };
@@ -156,13 +199,7 @@ export function EditPageDialog({ entry, locales, base, onOpenChange, onSaved }: 
           <div className="grid gap-1.5">
             <div className="flex items-center justify-between">
               <Label htmlFor="edit-title">Titre</Label>
-              <button
-                type="button"
-                className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                onClick={() => updateForm({ title: "" })}
-              >
-                Réinitialiser
-              </button>
+              <ResetButton onClick={() => updateForm({ title: "" })} />
             </div>
             <Input
               id="edit-title"
@@ -175,13 +212,7 @@ export function EditPageDialog({ entry, locales, base, onOpenChange, onSaved }: 
           <div className="grid gap-1.5">
             <div className="flex items-center justify-between">
               <Label htmlFor="edit-summary">Résumé</Label>
-              <button
-                type="button"
-                className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                onClick={() => updateForm({ summary: "" })}
-              >
-                Réinitialiser
-              </button>
+              <ResetButton onClick={() => updateForm({ summary: "" })} />
             </div>
             <Textarea
               id="edit-summary"
@@ -192,30 +223,94 @@ export function EditPageDialog({ entry, locales, base, onOpenChange, onSaved }: 
               rows={4}
             />
           </div>
+
+          {PER_LOCALE_FIELDS.map((field) => (
+            <div className="grid gap-1.5" key={field.key}>
+              <div className="flex items-center justify-between">
+                <Label htmlFor={`edit-custom-${field.key}`}>{field.label}</Label>
+                <ResetButton onClick={() => updateLocaleCustomField(field.key, "")} />
+              </div>
+              {field.type === "select" ? (
+                <Select
+                  value={form.customFields[field.key] ?? ""}
+                  onValueChange={(v) => updateLocaleCustomField(field.key, v)}
+                >
+                  <SelectTrigger id={`edit-custom-${field.key}`} className="w-full">
+                    <SelectValue placeholder="— choisir —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {field.options?.map((o) => (
+                      <SelectItem key={o.key} value={o.key}>
+                        {o.adminLabel}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id={`edit-custom-${field.key}`}
+                  value={form.customFields[field.key] ?? ""}
+                  onChange={(e) => updateLocaleCustomField(field.key, e.target.value)}
+                />
+              )}
+            </div>
+          ))}
+
           <div className="grid gap-1.5">
             <div className="flex items-center justify-between">
               <Label htmlFor="edit-category">Catégorie</Label>
-              <button
-                type="button"
-                className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                onClick={() => setCategory("")}
-              >
-                Réinitialiser
-              </button>
+              <ResetButton onClick={() => setCategory("")} />
             </div>
-            <Select value={category} onValueChange={(v) => setCategory(v as Category)}>
+            <Select value={category} onValueChange={setCategory}>
               <SelectTrigger id="edit-category" className="w-full">
                 <SelectValue placeholder="— choisir —" />
               </SelectTrigger>
               <SelectContent>
-                {CATEGORIES.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {CATEGORY_ADMIN_LABELS[c]}
+                {categories.map((c) => (
+                  <SelectItem key={c.key} value={c.key}>
+                    {c.adminLabel}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
+          {PAGE_LEVEL_FIELDS.map((field) => (
+            <div className="grid gap-1.5" key={field.key}>
+              <div className="flex items-center justify-between">
+                <Label htmlFor={`edit-custom-${field.key}`}>{field.label}</Label>
+                <ResetButton
+                  onClick={() => setPageCustomFields((prev) => ({ ...prev, [field.key]: "" }))}
+                />
+              </div>
+              {field.type === "select" ? (
+                <Select
+                  value={pageCustomFields[field.key] ?? ""}
+                  onValueChange={(v) => setPageCustomFields((prev) => ({ ...prev, [field.key]: v }))}
+                >
+                  <SelectTrigger id={`edit-custom-${field.key}`} className="w-full">
+                    <SelectValue placeholder="— choisir —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {field.options?.map((o) => (
+                      <SelectItem key={o.key} value={o.key}>
+                        {o.adminLabel}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id={`edit-custom-${field.key}`}
+                  value={pageCustomFields[field.key] ?? ""}
+                  onChange={(e) =>
+                    setPageCustomFields((prev) => ({ ...prev, [field.key]: e.target.value }))
+                  }
+                />
+              )}
+            </div>
+          ))}
+
           <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
             <div className="space-y-0.5">
               <Label htmlFor="edit-visible">Visible dans la recherche</Label>

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-08-24T00:00:00.000Z",
+  "collections": [
+    {
+      "collectionId": "seed-collection-blog",
+      "summaryField": "post-summary",
+      "defaultCategory": "blog"
+    }
+  ]
+}

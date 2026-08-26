@@ -1,9 +1,17 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { readPagesDoc, writePagesDoc, type PageEntry } from "../../../lib/pagesStore";
-import { CATEGORIES } from "../../../config/categories";
+import { readCategoriesDoc } from "../../../lib/categoriesStore";
+import { getCustomFieldConfig } from "../../../config/customFields";
 
-const EDITABLE_KEYS = ["localeId", "title", "summary", "category", "visibleInSearch"] as const;
+const EDITABLE_KEYS = [
+  "localeId",
+  "title",
+  "summary",
+  "category",
+  "visibleInSearch",
+  "customFields",
+] as const;
 type EditableKey = (typeof EDITABLE_KEYS)[number];
 const LOCALE_SCOPED_KEYS = ["title", "summary"] as const;
 
@@ -33,13 +41,38 @@ export const PATCH: APIRoute = async ({ params, request }) => {
 
   const patch = body as Partial<Record<EditableKey, unknown>>;
 
-  const touchesLocaleScopedField = LOCALE_SCOPED_KEYS.some((key) => key in patch);
+  const customFieldsPatch = patch.customFields;
+  if (
+    "customFields" in patch &&
+    (typeof customFieldsPatch !== "object" || customFieldsPatch === null || Array.isArray(customFieldsPatch))
+  ) {
+    return json(422, { error: "invalid_field", field: "customFields" });
+  }
+  const customFieldsEntries = Object.entries((customFieldsPatch ?? {}) as Record<string, unknown>);
+  for (const [key, value] of customFieldsEntries) {
+    const fieldConfig = getCustomFieldConfig(key);
+    if (!fieldConfig) return json(422, { error: "unknown_custom_field", field: key });
+    if (typeof value !== "string") return json(422, { error: "invalid_field", field: key });
+    if (fieldConfig.type === "select" && !fieldConfig.options?.some((o) => o.key === value)) {
+      return json(422, { error: "invalid_option", field: key });
+    }
+  }
+  const touchesPerLocaleCustomField = customFieldsEntries.some(
+    ([key]) => getCustomFieldConfig(key)?.perLocale
+  );
+
+  const touchesLocaleScopedField =
+    LOCALE_SCOPED_KEYS.some((key) => key in patch) || touchesPerLocaleCustomField;
   if (touchesLocaleScopedField && typeof patch.localeId !== "string") {
     return json(422, { error: "missing_locale_id" });
   }
 
-  if ("category" in patch && patch.category !== null && !CATEGORIES.includes(patch.category as any)) {
-    return json(422, { error: "invalid_category", allowed: CATEGORIES });
+  if ("category" in patch && patch.category !== null) {
+    const { doc: categoriesDoc } = await readCategoriesDoc(env.PAGES_BUCKET);
+    const allowedKeys = categoriesDoc.categories.map((c) => c.key);
+    if (!allowedKeys.includes(patch.category as string)) {
+      return json(422, { error: "invalid_category", allowed: allowedKeys });
+    }
   }
 
   for (const key of LOCALE_SCOPED_KEYS) {
@@ -78,12 +111,21 @@ export const PATCH: APIRoute = async ({ params, request }) => {
     if ("category" in patch) entry.category = patch.category as PageEntry["category"];
     if ("visibleInSearch" in patch) entry.visibleInSearch = patch.visibleInSearch as boolean;
 
-    if (touchesLocaleScopedField) {
-      const localeId = patch.localeId as string;
-      const localeContent = entry.locales[localeId];
-      if (localeContent) {
-        if ("title" in patch) localeContent.title = patch.title as string | null;
-        if ("summary" in patch) localeContent.summary = patch.summary as string | null;
+    const localeContent = touchesLocaleScopedField
+      ? entry.locales[patch.localeId as string]
+      : undefined;
+
+    if (touchesLocaleScopedField && localeContent) {
+      if ("title" in patch) localeContent.title = patch.title as string | null;
+      if ("summary" in patch) localeContent.summary = patch.summary as string | null;
+    }
+
+    for (const [key, value] of customFieldsEntries) {
+      const fieldConfig = getCustomFieldConfig(key)!; // already validated above
+      if (fieldConfig.perLocale) {
+        if (localeContent) localeContent.customFields[key] = value as string;
+      } else {
+        entry.customFields[key] = value as string;
       }
     }
 

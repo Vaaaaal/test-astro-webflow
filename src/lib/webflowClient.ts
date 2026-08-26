@@ -236,3 +236,52 @@ export async function getCollectionItem(
     fieldData: json.fieldData,
   };
 }
+
+export interface WebflowCollectionSummary {
+  id: string;
+  displayName: string;
+  slug: string;
+}
+
+/** Lists every CMS collection on the site — for the admin UI's collection picker. */
+export async function listSiteCollections(
+  siteId: string,
+  token: string
+): Promise<WebflowCollectionSummary[]> {
+  const res = await fetch(`https://api.webflow.com/v2/sites/${siteId}/collections`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "accept-version": "2.0.0",
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`Webflow list collections failed: ${res.status} ${await res.text()}`);
+  }
+  const json = await res.json<{
+    collections: Array<{ id: string; displayName: string; slug: string }>;
+  }>();
+  return json.collections.map((c) => ({ id: c.id, displayName: c.displayName, slug: c.slug }));
+}
+
+export interface WebflowCollectionField {
+  slug: string;
+  displayName: string;
+}
+
+/** Lists a collection's fields — for the admin UI's summary-field picker. */
+export async function getCollectionFields(
+  collectionId: string,
+  token: string
+): Promise<WebflowCollectionField[]> {
+  const res = await fetch(`https://api.webflow.com/v2/collections/${collectionId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "accept-version": "2.0.0",
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`Webflow get collection failed: ${res.status} ${await res.text()}`);
+  }
+  const json = await res.json<{ fields: Array<{ slug: string; displayName: string }> }>();
+  return json.fields.map((f) => ({ slug: f.slug, displayName: f.displayName }));
+}

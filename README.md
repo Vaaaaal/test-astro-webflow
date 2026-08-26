@@ -11,31 +11,47 @@ Ce repo est pensé comme un **template à cloner par site** : un déploiement (u
   - `collection_item_published` / `collection_item_unpublished` / `collection_item_deleted` — upsert ou suppression **incrémentale** d'un seul item CMS.
 
   Dans tous les cas, seuls les champs techniques sont créés/actualisés — jamais les champs éditoriaux.
-- **Manuel** : `/admin` liste les pages et items CMS déjà connus (badge "Page"/"CMS" dans le tableau) et permet d'éditer, pour chacun, le titre et le résumé (par langue si le site est multilingue), la catégorie et la visibilité en recherche (ces deux derniers au niveau de l'entrée, pas par langue). Rien ne peut être créé ou supprimé depuis cette interface — seul le webhook fait apparaître/disparaître des entrées.
+- **Manuel** : `/admin` liste les pages et items CMS déjà connus (badge "Page"/"CMS" dans le tableau, recherche par chemin/titre) et permet d'éditer, pour chacun, le titre, le résumé et les champs personnalisés (par langue si le site est multilingue), la catégorie et la visibilité en recherche (ces deux derniers au niveau de l'entrée, pas par langue). Aucune page/item ne peut être créé ou supprimé depuis cette interface — seul le webhook fait apparaître/disparaître des entrées. La **taxonomie** elle-même (catégories, collections CMS synchronisées) se gère sur `/admin/categories` et `/admin/collections` (réservées aux `admin`), voir sections dédiées ci-dessous.
 - **Public** : `GET /api/search-index` (pas d'authentification, CORS ouvert) renvoie les entrées avec `visibleInSearch: true` uniquement (pages et items CMS mélangés, indistincts pour le consommateur), aplaties pour une langue donnée — c'est ce qu'un widget de recherche externe consomme. Paramètre `?locale=<tag>` optionnel (ex. `en-US`) ; sans lui, renvoie la langue primaire du site. Réponse : `[{ url, title, summary, category }]`, avec repli automatique titre/résumé sur les valeurs Webflow natives si pas de surcharge éditoriale, et libellé de catégorie déjà traduit pour la langue demandée.
+
+## Catégories
+
+Gérées depuis `/admin/categories` (réservé aux `admin`) — plus un fichier de config statique. Stockées dans `categories.json` (R2, `src/lib/categoriesStore.ts`) : `key` (stable, immuable une fois créée — la renommer orphelinerait les pages déjà taguées), `adminLabel` (affiché dans l'admin Astro, une seule langue de référence, jamais traduit dans notre UI), `localeLabels` (par tag de locale, ex. `en-US` — pour un futur widget de recherche public, aucune API ne les expose encore), `prefixes` (préfixe de slug pour l'assignation automatique à la création d'une page — `"*"` par défaut, ou par tag de locale si un site traduit ses segments de dossier différemment selon la langue).
+
+Supprimer une catégorie repasse à `null` (pas de réassignation, pas de blocage) toutes les pages qui l'utilisaient — état déjà pleinement supporté partout (affiché "—", filtrable).
+
+`category` sur une page/item n'est **pas** un type TypeScript vérifié à la compilation — juste une clé validée à l'exécution contre la liste courante (lue depuis R2 côté API), puisque la liste est maintenant éditable en base. Compromis assumé pour la flexibilité multi-clients.
+
+Lecture (`GET /api/categories`) accessible aux `editor` (nécessaire pour éditer une page) ; création/édition/suppression réservées aux `admin`.
 
 ## Items CMS
 
-Une collection CMS est une ressource Webflow différente des pages statiques (`GET /v2/collections/{id}/items`, pas `GET /v2/sites/{id}/pages`) — invisible au webhook `site_publish`. Seules les collections listées dans [`src/config/cmsCollections.ts`](src/config/cmsCollections.ts) sont synchronisées (vide par défaut, à compléter par site — même philosophie que `CATEGORIES`, pas d'auto-découverte qui synchroniserait des collections non destinées à la recherche comme témoignages ou équipe).
+Une collection CMS est une ressource Webflow différente des pages statiques (`GET /v2/collections/{id}/items`, pas `GET /v2/sites/{id}/pages`) — invisible au webhook `site_publish`. Gérées depuis `/admin/collections` (réservé aux `admin`), qui liste en direct les collections du site via `GET /api/webflow-collections` (proxy vers `GET /v2/sites/{id}/collections`) — pas besoin de connaître un `collectionId` à la main. Seules les collections explicitement configurées là sont synchronisées (stocké dans `cmsCollections.json`, R2, `src/lib/cmsCollectionsStore.ts`) — pas d'auto-découverte qui synchroniserait des collections non destinées à la recherche comme témoignages ou équipe.
 
-Contrairement aux pages statiques, un item CMS n'a **aucun champ SEO standardisé** exposé par l'API (le titre/la description affichés sur le site sont liés à des champs dynamiques au niveau du template de page de collection, pas retournés tels quels) — `summaryField` dans la config indique quelle clé `fieldData` utiliser comme résumé, à défaut le résumé reste vide jusqu'à édition manuelle. `defaultCategory` assigne une catégorie de départ à la création (toujours modifiable ensuite) — l'identité de la collection suffit comme signal, pas besoin de préfixe d'URL comme pour les pages.
+En dev sans `WEBFLOW_API_TOKEN`/`WEBFLOW_SITE_ID` configurés dans `.dev.vars`, `GET /api/webflow-collections` renvoie des données simulées (deux collections d'exemple, dont une sans chemin détecté) au lieu d'appeler l'API Webflow — même principe que `request-magic-link` qui n'appelle jamais Resend en dev. Si ces identifiants sont renseignés, même en dev, l'appel réel est utilisé.
 
-L'URL d'un item (`{sous-répertoire de langue}/{slug de la collection}/{slug de l'item}`) est reconstruite manuellement — Webflow ne l'expose pas directement pour les items CMS comme il le fait pour les pages (`publishedPath`). **Non vérifié empiriquement contre un vrai site avec une vraie collection** — à confirmer dès qu'un cas réel existe.
+Contrairement aux pages statiques, un item CMS n'a **aucun champ SEO standardisé** exposé par l'API (le titre/la description affichés sur le site sont liés à des champs dynamiques au niveau du template de page de collection, pas retournés tels quels) — `summaryField` (choisi dans `/admin/collections` parmi les vrais champs de la collection) indique quelle clé `fieldData` utiliser comme résumé, à défaut le résumé reste vide jusqu'à édition manuelle. `defaultCategory` assigne une catégorie de départ à la création (toujours modifiable ensuite) — l'identité de la collection suffit comme signal, pas besoin de préfixe d'URL comme pour les pages.
+
+L'URL d'un item (`{publishedPath de la page-template de la collection}/{slug de l'item}`) est résolue en lisant le `publishedPath` de la page-template de collection parmi les pages du site (`getCollectionPagePath`, `src/lib/webflowClient.ts`) — **vérifié contre un vrai site** : le slug de la collection seul ne suffit pas et peut donner une URL fausse. Si la page de collection n'a jamais été construite/publiée dans le Designer (juste créée via l'API), aucun chemin n'est détecté et l'item n'est pas synchronisé tant que ça n'est pas fait.
 
 Chaque webhook Webflow enregistré (un par `triggerType`) génère sa propre clé de signature — `WEBFLOW_WEBHOOK_SECRETS` (au pluriel) accepte une liste séparée par des virgules, une par webhook enregistré.
+
+## Champs personnalisés
+
+Pour ajouter un champ (texte ou select) au-delà de titre/résumé/catégorie sans retoucher `EditPageDialog.tsx` à chaque fois : déclarer le champ dans [`src/config/customFields.ts`](src/config/customFields.ts) (vide par défaut, config de code — pas de CRUD en admin, volontairement, pour éviter la complexité d'un schema-builder complet). Le formulaire d'édition rend les champs dynamiquement à partir de cette liste.
+
+Chaque champ a `perLocale: boolean` : `true` pour du contenu éditorial qui varie par langue (stocké par locale, même mécanisme que titre/résumé, avec le sélecteur de langue déjà en place) ; `false` pour un réglage/flag unique pour toute la page (stocké au niveau page, même mécanisme que catégorie/visibilité). Un champ `select` a des options à clé stable (`options[].key`) avec un libellé admin (`adminLabel`, une langue de référence) et, optionnellement, des libellés traduits par locale (`localeLabels`) — même modèle que les catégories — exposés par `/api/search-index` (jamais dans notre UI admin, qui reste toujours dans la langue de référence).
 
 ## Multilingue
 
 Une page Webflow garde le même ID à travers toutes ses langues (Webflow ne duplique pas les pages par locale) — seuls le slug, le titre SEO et la meta-description sont propres à chaque langue. Le webhook récupère la liste des langues du site via `GET /v2/sites/{site_id}` (stockée dans `locales.json`) puis synchronise chaque page pour chaque langue. `/admin` affiche un sélecteur de langue dans la modal d'édition uniquement si le site a plus d'une langue configurée — un site mono-langue n'a aucun sélecteur.
 
-Les **catégories** sont des clés stables (`src/config/categories.ts`), pas des libellés — l'admin Astro les affiche toujours dans une seule langue de référence (`CATEGORY_ADMIN_LABELS`), quelle que soit la langue de la page éditée. La traduction des libellés par langue (`CATEGORY_LOCALE_LABELS`, une entrée par tag de locale comme `en-US`, toutes les catégories de cette langue regroupées ensemble) est prévue pour un futur widget de recherche public — un exemple fr-FR/en-US est déjà rempli, à adapter par site ; `getCategoryLabel(category, localeTag)` fait le lookup avec repli automatique sur `CATEGORY_ADMIN_LABELS` si une langue/catégorie n'a pas encore de traduction. Aucune API ne l'expose encore, aucun consommateur n'existe pour l'instant.
-
 ## Authentification et rôles
 
 Connexion par **magic link** (email → lien de connexion à usage unique, sans mot de passe), pas d'auto-inscription. Trois rôles, `editor < admin < super_admin` :
 
-- **editor** — accède à `/admin` et édite le contenu des pages.
-- **admin** — idem + gère les comptes `editor`/`admin` (ajout, changement de rôle, suppression) sur `/admin/users`, mais ne peut jamais créer/modifier/supprimer un compte `super_admin`, ni se promouvoir lui-même.
+- **editor** — accède à `/admin` et édite le contenu des pages (y compris choisir une catégorie existante), en lecture seule sur les catégories/collections CMS elles-mêmes.
+- **admin** — idem + gère les comptes `editor`/`admin` (ajout, changement de rôle, suppression) sur `/admin/users`, mais ne peut jamais créer/modifier/supprimer un compte `super_admin`, ni se promouvoir lui-même + gère la taxonomie (`/admin/categories`, `/admin/collections`).
 - **super_admin** — accès total, y compris la gestion d'autres `super_admin`. Réservé au propriétaire du site / futurs devs. Accordé de façon permanente aux emails listés dans le secret `SUPER_ADMIN_EMAILS`, indépendamment du fichier utilisateurs — c'est ce qui amorce le tout premier accès (pas de page d'inscription).
 
 Envoi des emails via [Resend](https://resend.com).
@@ -54,27 +70,35 @@ Envoi des emails via [Resend](https://resend.com).
 
    ⚠️ **Piège confirmé** : si un `id` est absent ou invalide, le build Webflow Cloud échoue la validation de schéma de `wrangler.json` et **remplace silencieusement tout le fichier par un template générique** pour ce déploiement — le bucket R2, les KV, les `vars` custom disparaissent tous sans message d'erreur visible côté dashboard (ce template générique de secours a par ailleurs son propre binding `SESSION` par défaut, ce qui peut faire croire à tort que la connexion fonctionne alors que rien de notre config custom n'est réellement déployé). Vérifier dans les logs de build la ligne `schema validation failed` / `copying wrangler template for astro` si un déploiement semble "ne rien connecter".
 4. **Renseigner `WEBFLOW_SITE_ID`** dans `wrangler.json` (clé `vars`), l'ID du site Webflow ciblé.
-5. **Adapter les catégories** dans [`src/config/categories.ts`](src/config/categories.ts) — clés stables + libellé admin (une seule langue). Les traductions par langue (`CATEGORY_LOCALE_LABELS`) sont à compléter séparément, plus tard, quand le widget de recherche public existera. `DEFAULT_CATEGORY_RULES` assigne une catégorie de départ (toujours modifiable ensuite en admin) à une page selon un préfixe de son slug, testé sur chaque langue — `"*"` est le préfixe utilisé par défaut, à préciser par tag de locale (`"fr-FR"`, `"de-DE"`, ...) uniquement si un site traduit ses segments de dossier différemment selon la langue. **(Optionnel)** configurer aussi les collections CMS destinées à la recherche dans [`src/config/cmsCollections.ts`](src/config/cmsCollections.ts) — voir section "Items CMS" ci-dessus.
+5. **Créer les catégories** depuis `/admin/categories` une fois déployé (voir section "Catégories" ci-dessus) — plus un fichier de config à éditer. **(Optionnel)** configurer aussi les collections CMS destinées à la recherche depuis `/admin/collections` — voir section "Items CMS" ci-dessus. **(Optionnel)** déclarer des champs personnalisés dans [`src/config/customFields.ts`](src/config/customFields.ts) — voir section "Champs personnalisés" ci-dessus.
 6. **Créer un token API Webflow** (Site settings → Apps & Integrations → API access, lecture des pages) et définir le secret `WEBFLOW_API_TOKEN` (jamais commité) — en local dans `.dev.vars`, en production via `wrangler secret put WEBFLOW_API_TOKEN` ou le dashboard Webflow Cloud.
 7. **Enregistrer le(s) webhook(s) côté Webflow** (Site settings → Webhooks → Add webhook) pointant vers `https://<ton-app>/api/webhooks/webflow` — seulement une fois l'app déployée et son URL connue. Un webhook par `triggerType` à enregistrer :
    - `site_publish` — toujours nécessaire.
-   - `collection_item_published`, `collection_item_unpublished`, `collection_item_deleted` — uniquement si des collections CMS sont listées dans `src/config/cmsCollections.ts` (voir section "Items CMS" ci-dessus).
+   - `collection_item_published`, `collection_item_unpublished`, `collection_item_deleted` — uniquement si des collections CMS sont configurées depuis `/admin/collections` (voir section "Items CMS" ci-dessus).
 
    Webflow **génère lui-même** une clé de signature à chaque création de webhook (affichée une seule fois, à copier immédiatement) — ce n'est pas une valeur qu'on choisit, et chaque webhook a la sienne. Concatène toutes les clés dans le secret `WEBFLOW_WEBHOOK_SECRETS` (au pluriel, séparées par des virgules — même emplacement que `WEBFLOW_API_TOKEN` ci-dessus). Chaque webhook signe ses requêtes (headers `x-webflow-signature` / `x-webflow-timestamp`, HMAC-SHA256) — `verifyWebflowSignature` (`src/lib/webhookSignature.ts`) accepte une requête si elle matche N'IMPORTE LAQUELLE des clés listées ; les requêtes non signées ou mal signées sont rejetées en 401.
 8. **Configurer Resend** — vérifier un domaine d'envoi, renseigner `EMAIL_FROM_ADDRESS` dans `wrangler.json` (`vars`), et définir le secret `RESEND_API_KEY`.
 9. **Définir `SUPER_ADMIN_EMAILS`** (secret, liste d'emails séparés par des virgules) — amorce le tout premier accès super_admin.
-10. **(Optionnel) Adapter les seeds locaux** dans [`seed/pages.local.json`](seed/pages.local.json), [`seed/locales.local.json`](seed/locales.local.json) et [`seed/users.local.json`](seed/users.local.json) — servent uniquement à peupler le R2/KV simulés en dev, sans impact en production.
+10. **(Optionnel) Adapter les seeds locaux** dans `seed/` — servent uniquement à peupler le R2/KV simulés en dev, sans impact en production.
 
 ## Seed de données en local
 
-Sans appel webhook réel ni email envoyé, on peut peupler le R2 simulé localement :
+D'abord, copier le template de secrets locaux et le compléter :
+```
+cp .dev.vars.copy .dev.vars
+```
+`.dev.vars.copy` est commité (c'est un template, sans vraies valeurs) ; `.dev.vars` lui-même est gitignoré — ne jamais y mettre de vrais secrets sans vérifier qu'il reste bien ignoré. Renseigne au minimum `SUPER_ADMIN_EMAILS` avec ton email pour pouvoir te connecter ; `WEBFLOW_API_TOKEN`/`WEBFLOW_WEBHOOK_SECRETS` ne sont nécessaires que si tu testes le webhook ou `/admin/collections` contre un vrai site (sinon cette dernière page fonctionne avec des données simulées, voir section "Items CMS").
+
+Sans appel webhook réel ni email envoyé, on peut ensuite peupler le R2 simulé localement :
 ```
 npm run dev            # démarre le serveur (crée l'état Miniflare local)
 wrangler r2 object put <nom-du-bucket>/pages.json --file=./seed/pages.local.json --local
 wrangler r2 object put <nom-du-bucket>/locales.json --file=./seed/locales.local.json --local
+wrangler r2 object put <nom-du-bucket>/categories.json --file=./seed/categories.local.json --local
+wrangler r2 object put <nom-du-bucket>/cmsCollections.json --file=./seed/cmsCollections.local.json --local
 wrangler r2 object put <nom-du-bucket>/users.json --file=./seed/users.local.json --local
 ```
-Dans `.dev.vars`, définir `SUPER_ADMIN_EMAILS=<ton email>` pour te connecter sans être dans `users.json`. En dev, `POST /api/auth/request-magic-link` n'appelle jamais Resend — il renvoie `devMagicLinkUrl` directement dans la réponse JSON (et l'affiche dans le formulaire de connexion) pour tester sans compte email.
+En dev, `POST /api/auth/request-magic-link` n'appelle jamais Resend — il renvoie `devMagicLinkUrl` directement dans la réponse JSON (et l'affiche dans le formulaire de connexion) pour tester sans compte email.
 
 Puis ouvrir `http://localhost:4321/admin`.
 
@@ -82,50 +106,58 @@ Puis ouvrir `http://localhost:4321/admin`.
 
 ```text
 .
+├── .dev.vars.copy              # template de secrets locaux — copier en .dev.vars (gitignoré) et compléter
 ├── astro.config.mjs
 ├── package.json
 ├── seed/
-│   ├── pages.local.json       # données d'exemple pour le dev local
-│   ├── locales.local.json     # langues d'exemple pour le dev local
-│   └── users.local.json       # comptes d'exemple pour le dev local
+│   ├── pages.local.json         # données d'exemple pour le dev local
+│   ├── locales.local.json       # langues d'exemple pour le dev local
+│   ├── categories.local.json    # catégories d'exemple pour le dev local
+│   ├── cmsCollections.local.json # config collections CMS d'exemple pour le dev local
+│   └── users.local.json         # comptes d'exemple pour le dev local
 ├── src/
 │   ├── config/
-│   │   ├── categories.ts      # taxonomie de recherche — à adapter par site
-│   │   ├── cmsCollections.ts  # collections CMS synchronisées — vide par défaut, à adapter par site
+│   │   ├── customFields.ts    # champs personnalisés déclarés en code — vide par défaut, à adapter par site
 │   │   └── roles.ts           # rôles + règles d'escalade (partagé serveur/UI)
 │   ├── components/
-│   │   ├── admin/             # PagesAdmin, EditPageDialog, UsersAdmin, AddUserDialog
+│   │   ├── admin/             # PagesAdmin, EditPageDialog, UsersAdmin, AddUserDialog, CategoriesAdmin, CategoryDialog, CmsCollectionsAdmin, CmsCollectionDialog
 │   │   ├── auth/               # LoginForm
 │   │   └── ui/                # composants shadcn/ui
 │   ├── env.d.ts                # types Astro.locals/session + secrets Cloudflare.Env
-│   ├── middleware.ts           # résout l'utilisateur courant, protège /admin et /api
+│   ├── middleware.ts           # résout l'utilisateur courant, protège /admin et /api (lecture editor / écriture admin par rule)
 │   ├── layouts/
 │   │   ├── Layout.astro
-│   │   └── AdminLayout.astro   # header (email, lien users, déconnexion)
+│   │   └── AdminLayout.astro   # header (email, liens users/categories/collections, déconnexion)
 │   ├── lib/
-│   │   ├── pagesStore.ts      # schéma + lecture/écriture R2 (pages.json)
-│   │   ├── localesStore.ts    # schéma + lecture/écriture R2 (locales.json)
-│   │   ├── usersStore.ts      # schéma + lecture/écriture R2 (users.json)
-│   │   ├── auth.ts             # résolution email → rôle (bootstrap + users.json)
-│   │   ├── authTokens.ts       # tokens magic-link à usage unique (KV)
-│   │   ├── resendClient.ts     # envoi d'email via Resend
-│   │   ├── webflowClient.ts   # client Webflow Data API v2
+│   │   ├── pagesStore.ts          # schéma + lecture/écriture R2 (pages.json)
+│   │   ├── localesStore.ts        # schéma + lecture/écriture R2 (locales.json)
+│   │   ├── categoriesStore.ts     # schéma + lecture/écriture R2 (categories.json) — taxonomie éditable en admin
+│   │   ├── cmsCollectionsStore.ts # schéma + lecture/écriture R2 (cmsCollections.json)
+│   │   ├── usersStore.ts          # schéma + lecture/écriture R2 (users.json)
+│   │   ├── auth.ts                 # résolution email → rôle (bootstrap + users.json)
+│   │   ├── authTokens.ts           # tokens magic-link à usage unique (KV)
+│   │   ├── resendClient.ts         # envoi d'email via Resend
+│   │   ├── webflowClient.ts       # client Webflow Data API v2
 │   │   └── utils.ts
 │   ├── pages/
 │   │   ├── admin/
-│   │   │   ├── index.astro    # interface d'admin (contenu)
-│   │   │   └── users/
-│   │   │       └── index.astro # interface d'admin (utilisateurs)
+│   │   │   ├── index.astro       # interface d'admin (contenu)
+│   │   │   ├── users/index.astro       # interface d'admin (utilisateurs)
+│   │   │   ├── categories/index.astro  # interface d'admin (catégories)
+│   │   │   └── collections/index.astro # interface d'admin (collections CMS)
 │   │   ├── login/
 │   │   │   └── index.astro    # connexion par magic link
 │   │   ├── api/
-│   │   │   ├── auth/          # request-magic-link, verify, logout
-│   │   │   ├── users/         # GET/POST liste, PATCH/DELETE un utilisateur
-│   │   │   ├── pages/         # GET liste / PATCH une page (avec localeId)
-│   │   │   ├── locales/       # GET liste des langues du site
-│   │   │   ├── search-index/  # GET public, index de recherche pour le widget externe
+│   │   │   ├── auth/               # request-magic-link, verify, logout
+│   │   │   ├── users/               # GET/POST liste, PATCH/DELETE un utilisateur
+│   │   │   ├── pages/               # GET liste / PATCH une page (avec localeId, customFields)
+│   │   │   ├── locales/             # GET liste des langues du site
+│   │   │   ├── categories/          # GET/POST liste, PATCH/DELETE une catégorie
+│   │   │   ├── cms-collections/     # GET/POST liste, PATCH/DELETE une config de collection
+│   │   │   ├── webflow-collections/ # GET proxy live vers les collections Webflow du site
+│   │   │   ├── search-index/       # GET public, index de recherche pour le widget externe
 │   │   │   └── webhooks/
-│   │   │       └── webflow.ts # récepteur webhook Webflow
+│   │   │       └── webflow.ts      # récepteur webhook Webflow
 │   │   └── index.astro        # redirige vers /admin
 │   └── styles/
 │       └── global.css

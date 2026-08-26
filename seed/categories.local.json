@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-08-24T00:00:00.000Z",
+  "categories": [
+    {
+      "key": "plateformes",
+      "adminLabel": "Plateformes",
+      "localeLabels": { "fr-FR": "Plateformes", "en-US": "Platforms" },
+      "prefixes": {}
+    },
+    {
+      "key": "solutions",
+      "adminLabel": "Solutions",
+      "localeLabels": { "fr-FR": "Solutions", "en-US": "Solutions" },
+      "prefixes": {}
+    },
+    {
+      "key": "etudes-de-cas",
+      "adminLabel": "Études de cas",
+      "localeLabels": { "fr-FR": "Études de cas", "en-US": "Case studies" },
+      "prefixes": { "*": "etudes-de-cas/" }
+    },
+    {
+      "key": "documentation",
+      "adminLabel": "Documentation",
+      "localeLabels": { "fr-FR": "Documentation", "en-US": "Documentation" },
+      "prefixes": { "*": "documentation/" }
+    },
+    {
+      "key": "livres-blancs",
+      "adminLabel": "Livres blancs",
+      "localeLabels": { "fr-FR": "Livres blancs", "en-US": "White papers" },
+      "prefixes": { "*": "livres-blancs/" }
+    },
+    {
+      "key": "guides",
+      "adminLabel": "Guides",
+      "localeLabels": { "fr-FR": "Guides", "en-US": "Guides" },
+      "prefixes": { "*": "guides/" }
+    },
+    {
+      "key": "blog",
+      "adminLabel": "Blog",
+      "localeLabels": { "fr-FR": "Blog", "en-US": "Blog" },
+      "prefixes": { "*": "blog/" }
+    }
+  ]
+}

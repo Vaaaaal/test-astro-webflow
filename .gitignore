@@ -26,6 +26,9 @@ pnpm-debug.log*
 # wrangler files
 .wrangler
 .dev.vars*
+# ...except the committed template — rename to .dev.vars and fill in real
+# values locally, never commit that file back.
+!.dev.vars.copy
 
 # webflow cli build artifacts
 .tmp/

@@ -18,10 +18,17 @@ function stripBase(pathname: string): string {
 interface Rule {
   prefix: string;
   minRole: Role;
+  // Stricter role required for mutating methods (POST/PATCH/DELETE/PUT);
+  // defaults to minRole. Lets a resource be editor-readable (e.g. an editor
+  // picking a category while editing a page) but admin-writable (managing
+  // the taxonomy itself) without scattering inline role checks per route.
+  writeMinRole?: Role;
 }
 
 const PAGE_RULES: Rule[] = [
   { prefix: "/admin/users", minRole: "admin" },
+  { prefix: "/admin/categories", minRole: "admin" },
+  { prefix: "/admin/collections", minRole: "admin" },
   { prefix: "/admin", minRole: "editor" },
 ];
 
@@ -29,7 +36,12 @@ const API_RULES: Rule[] = [
   { prefix: "/api/users", minRole: "admin" },
   { prefix: "/api/pages", minRole: "editor" },
   { prefix: "/api/locales", minRole: "editor" },
+  { prefix: "/api/categories", minRole: "editor", writeMinRole: "admin" },
+  { prefix: "/api/cms-collections", minRole: "editor", writeMinRole: "admin" },
+  { prefix: "/api/webflow-collections", minRole: "admin" },
 ];
+
+const READ_METHODS = new Set(["GET", "HEAD"]);
 
 function matchRule(rules: Rule[], path: string): Rule | undefined {
   return rules
@@ -53,7 +65,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const apiRule = matchRule(API_RULES, path);
   if (apiRule) {
     if (!context.locals.user) return json(401, { error: "unauthenticated" });
-    if (!roleAtLeast(context.locals.user.role, apiRule.minRole)) {
+    const requiredRole = READ_METHODS.has(context.request.method)
+      ? apiRule.minRole
+      : (apiRule.writeMinRole ?? apiRule.minRole);
+    if (!roleAtLeast(context.locals.user.role, requiredRole)) {
       return json(403, { error: "forbidden" });
     }
     return next();

@@ -10,8 +10,8 @@ import {
   type WebflowPageSeo,
   type WebflowCollectionItem,
 } from "../../../lib/webflowClient";
-import { resolveDefaultCategory } from "../../../config/categories";
-import { getCmsCollectionConfig } from "../../../config/cmsCollections";
+import { resolveDefaultCategory, readCategoriesDoc } from "../../../lib/categoriesStore";
+import { readCmsCollectionsDoc, findCmsCollection } from "../../../lib/cmsCollectionsStore";
 import { verifyWebflowSignature } from "../../../lib/webhookSignature";
 
 function json(status: number, body: unknown): Response {
@@ -53,6 +53,8 @@ async function handleSitePublish(siteId: string | undefined): Promise<Response> 
 
   await writeLocalesDoc(env.PAGES_BUCKET, locales);
 
+  const { doc: categoriesDoc } = await readCategoriesDoc(env.PAGES_BUCKET);
+
   const now = new Date().toISOString();
   const pageIds = new Set<string>();
   for (const pages of pagesByLocale.values()) {
@@ -76,8 +78,9 @@ async function handleSitePublish(siteId: string | undefined): Promise<Response> 
             kind: "page",
             collectionId: null,
             lastPublishedAt: now,
-            category: resolveDefaultCategory(slugsByLocale),
+            category: resolveDefaultCategory(categoriesDoc.categories, slugsByLocale),
             visibleInSearch: true,
+            customFields: {},
             locales: {},
           };
           doc.pages.push(entry);
@@ -96,6 +99,7 @@ async function handleSitePublish(siteId: string | undefined): Promise<Response> 
             webflowMetaDescription: wfPage.webflowMetaDescription,
             title: existing?.title ?? null,
             summary: existing?.summary ?? null,
+            customFields: existing?.customFields ?? {},
           };
         }
       }
@@ -131,7 +135,8 @@ async function handleCollectionItemPublished(
 ): Promise<Response> {
   if (!itemId || !collectionId) return json(400, { error: "invalid_payload" });
 
-  const cmsConfig = getCmsCollectionConfig(collectionId);
+  const { doc: cmsCollectionsDoc } = await readCmsCollectionsDoc(env.PAGES_BUCKET);
+  const cmsConfig = findCmsCollection(cmsCollectionsDoc, collectionId);
   if (!cmsConfig) return json(200, { skipped: true, reason: "collection_not_configured" });
 
   const localesDoc = await readLocalesDoc(env.PAGES_BUCKET);
@@ -185,6 +190,7 @@ async function handleCollectionItemPublished(
           lastPublishedAt: now,
           category: cmsConfig.defaultCategory ?? null,
           visibleInSearch: true,
+          customFields: {},
           locales: {},
         };
         doc.pages.push(entry);
@@ -211,6 +217,7 @@ async function handleCollectionItemPublished(
           webflowMetaDescription: summary,
           title: existing?.title ?? null,
           summary: existing?.summary ?? null,
+          customFields: existing?.customFields ?? {},
         };
       }
       return doc;

@@ -1,36 +1,16 @@
 ---
 import Layout from "./Layout.astro";
-import { roleAtLeast } from "../config/roles";
+import { AdminShell } from "../components/AdminShell";
 
 const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "") || "";
 // Guaranteed non-null: this layout is only ever used under /admin, which
 // the middleware requires a logged-in user (role >= editor) to reach.
 const user = Astro.locals.user!;
-const canManageUsers = roleAtLeast(user.role, "admin");
+const currentPath = Astro.url.pathname;
 ---
 
 <Layout>
-  <div class="border-b">
-    <div class="mx-auto flex w-full max-w-4xl items-center justify-between px-4 py-3">
-      <nav class="flex items-center gap-4 text-sm">
-        <a href={`${base}/admin`} class="font-medium">Minisearch</a>
-        {
-          canManageUsers && (
-            <a href={`${base}/admin/users`} class="text-muted-foreground hover:text-foreground">
-              Gérer les utilisateurs
-            </a>
-          )
-        }
-      </nav>
-      <div class="flex items-center gap-3 text-sm text-muted-foreground">
-        <span>{user.email}</span>
-        <form method="POST" action={`${base}/api/auth/logout`}>
-          <button type="submit" class="text-foreground underline underline-offset-2">
-            Se déconnecter
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
-  <slot />
+  <AdminShell client:load base={base} currentPath={currentPath} user={user}>
+    <slot />
+  </AdminShell>
 </Layout>

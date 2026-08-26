@@ -1,0 +1,17 @@
+---
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import CmsCollectionsAdmin from "../../../components/admin/CmsCollectionsAdmin";
+
+const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "") || "";
+---
+
+<AdminLayout>
+  <main class="mx-auto w-full max-w-5xl px-4 py-10">
+    <h1 class="mb-1 text-2xl font-semibold">Collections CMS</h1>
+    <p class="mb-8 text-sm text-muted-foreground">
+      Choisis quelles collections Webflow alimentent la recherche, et comment. Le chemin de base
+      est toujours détecté en direct depuis Webflow, jamais mis en cache.
+    </p>
+    <CmsCollectionsAdmin client:load base={base} />
+  </main>
+</AdminLayout>

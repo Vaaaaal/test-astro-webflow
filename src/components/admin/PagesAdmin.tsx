@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { PageEntry } from "@/lib/pagesStore";
 import type { LocaleInfo } from "@/lib/localesStore";
-import { CATEGORY_ADMIN_LABELS } from "@/config/categories";
+import { getCategoryAdminLabel, type CategoryEntry } from "@/lib/categoriesStore";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ interface PagesAdminProps {
 export default function PagesAdmin({ base }: PagesAdminProps) {
   const [pages, setPages] = useState<PageEntry[] | null>(null);
   const [locales, setLocales] = useState<LocaleInfo[]>([]);
+  const [categories, setCategories] = useState<CategoryEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -39,10 +40,15 @@ export default function PagesAdmin({ base }: PagesAdminProps) {
         if (!res.ok) throw new Error(`GET /api/locales failed: ${res.status}`);
         return res.json() as Promise<LocaleInfo[]>;
       }),
+      fetch(`${base}/api/categories`).then((res) => {
+        if (!res.ok) throw new Error(`GET /api/categories failed: ${res.status}`);
+        return res.json() as Promise<CategoryEntry[]>;
+      }),
     ])
-      .then(([pagesData, localesData]) => {
+      .then(([pagesData, localesData, categoriesData]) => {
         setPages(pagesData);
         setLocales(localesData);
+        setCategories(categoriesData);
       })
       .catch((err) => {
         const message = err instanceof Error ? err.message : String(err);
@@ -162,7 +168,7 @@ export default function PagesAdmin({ base }: PagesAdminProps) {
                 </TableCell>
                 <TableCell>
                   {page.category ? (
-                    <Badge variant="secondary">{CATEGORY_ADMIN_LABELS[page.category]}</Badge>
+                    <Badge variant="secondary">{getCategoryAdminLabel(categories, page.category)}</Badge>
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
@@ -196,6 +202,7 @@ export default function PagesAdmin({ base }: PagesAdminProps) {
       <EditPageDialog
         entry={editingEntry}
         locales={locales}
+        categories={categories}
         base={base}
         onOpenChange={(open) => {
           if (!open) setEditingId(null);

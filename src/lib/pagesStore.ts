@@ -1,5 +1,3 @@
-import type { Category } from "../config/categories";
-
 export interface LocalizedPageContent {
   // lecture seule — écrit uniquement par le webhook Webflow
   slug: string; // identifiant stable de la page, sans le préfixe de langue
@@ -10,6 +8,8 @@ export interface LocalizedPageContent {
   // éditable — écrit uniquement par PATCH /api/pages/:id (avec localeId)
   title: string | null;
   summary: string | null;
+  // valeurs des champs personnalisés perLocale: true (src/config/customFields.ts), par clé de champ
+  customFields: Record<string, string>;
 }
 
 export interface PageEntry {
@@ -25,8 +25,12 @@ export interface PageEntry {
   collectionId: string | null;
 
   // niveau page, pas par langue — éditable via PATCH /api/pages/:id
-  category: Category | null;
+  // référence CategoryEntry.key (src/lib/categoriesStore.ts) — pas un type
+  // vérifié à la compilation, la liste de catégories est éditable en base.
+  category: string | null;
   visibleInSearch: boolean;
+  // valeurs des champs personnalisés perLocale: false, par clé de champ
+  customFields: Record<string, string>;
 
   // contenu par langue, clé = localeId Webflow
   locales: Record<string, LocalizedPageContent>;

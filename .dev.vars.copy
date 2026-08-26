@@ -1,0 +1,26 @@
+# Copy this file to .dev.vars (remove the ".copy" suffix) and fill in real
+# values for your local/test environment. .dev.vars itself is gitignored —
+# never commit real secrets, only this template.
+
+# Webflow API token — Site settings -> Apps & Integrations -> API access.
+# Needs read access to Pages, CMS, and Sites at minimum (required for the
+# webhook sync and the /admin/collections live proxy).
+WEBFLOW_API_TOKEN=
+
+# Comma-separated signing secrets, one per webhook registered on Webflow
+# (Site settings -> Webhooks -> Add webhook). Each webhook gets its own
+# secret, shown once at creation time — copy it immediately, it can't be
+# retrieved again. Only needed if you're exercising
+# POST /api/webhooks/webflow locally; not required to use the admin UI.
+WEBFLOW_WEBHOOK_SECRETS=
+
+# Never actually called in dev — POST /api/auth/request-magic-link returns
+# devMagicLinkUrl directly in the response instead of sending an email.
+# Any non-empty value works; keep this placeholder unless you specifically
+# want to test the real Resend integration locally.
+RESEND_API_KEY=dev-placeholder-never-called-in-DEV
+
+# Comma-separated emails that get super_admin access without needing to be
+# in users.json — this is how you get your very first login. Put your own
+# email here.
+SUPER_ADMIN_EMAILS=
