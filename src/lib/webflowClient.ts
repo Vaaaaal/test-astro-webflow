@@ -140,3 +140,99 @@ export async function getSiteLocales(siteId: string, token: string): Promise<Loc
     ...(locales.secondary ?? []).map((l) => toLocaleInfo(l, false)),
   ];
 }
+
+/**
+ * Finds the URL prefix live collection items are served under, by locating
+ * the collection's page TEMPLATE among the site's pages and reading its own
+ * `publishedPath` (e.g. "/post") — Webflow's own computed value, confirmed
+ * against a real site to be the right prefix, unlike reconstructing one
+ * from the collection's own `slug` field (which happened to match in that
+ * one test but isn't a documented guarantee). Pass `localeId` the same way
+ * as `listStaticPages` — the template's own publishedPath is itself
+ * locale-prefixed for secondary locales, mirroring regular pages. Returns
+ * null if the collection has no page template synced yet (e.g. draft, or
+ * never actually built out in the Designer).
+ */
+export async function getCollectionPagePath(
+  siteId: string,
+  collectionId: string,
+  token: string,
+  localeId?: string
+): Promise<string | null> {
+  const limit = 100;
+  let offset = 0;
+  const localeParam = localeId ? `&localeId=${encodeURIComponent(localeId)}` : "";
+
+  while (true) {
+    const res = await fetch(
+      `https://api.webflow.com/v2/sites/${siteId}/pages?limit=${limit}&offset=${offset}${localeParam}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "accept-version": "2.0.0",
+        },
+      }
+    );
+    if (!res.ok) {
+      throw new Error(`Webflow pages list failed: ${res.status} ${await res.text()}`);
+    }
+    const json = await res.json<WebflowPagesResponse>();
+    const match = json.pages.find((p) => p.collectionId === collectionId);
+    if (match) return match.publishedPath ?? null;
+    offset += limit;
+    if (offset >= json.pagination.total) break;
+  }
+  return null;
+}
+
+export interface WebflowCollectionItem {
+  id: string;
+  slug: string;
+  name: string;
+  isDraft: boolean;
+  isArchived: boolean;
+  fieldData: Record<string, unknown>;
+}
+
+/**
+ * Fetches a single CMS collection item, optionally for a specific locale
+ * (mirrors listStaticPages's `localeId` — omit for the primary/default
+ * locale). Unlike the collection_item_published webhook payload (which only
+ * guarantees fieldData.name/slug), this returns the item's full fieldData,
+ * needed to read a site-specific summary field (see CmsCollectionConfig).
+ */
+export async function getCollectionItem(
+  collectionId: string,
+  itemId: string,
+  token: string,
+  cmsLocaleId?: string
+): Promise<WebflowCollectionItem | null> {
+  const localeParam = cmsLocaleId ? `?cmsLocaleId=${encodeURIComponent(cmsLocaleId)}` : "";
+  const res = await fetch(
+    `https://api.webflow.com/v2/collections/${collectionId}/items/${itemId}${localeParam}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "accept-version": "2.0.0",
+      },
+    }
+  );
+  if (res.status === 404) return null; // item doesn't exist in this locale
+  if (!res.ok) {
+    throw new Error(`Webflow get collection item failed: ${res.status} ${await res.text()}`);
+  }
+  const json = await res.json<{
+    id: string;
+    isDraft?: boolean;
+    isArchived?: boolean;
+    fieldData: { name: string; slug: string | null; [key: string]: unknown };
+  }>();
+  return {
+    id: json.id,
+    slug: json.fieldData.slug ?? "",
+    name: json.fieldData.name,
+    isDraft: json.isDraft ?? false,
+    isArchived: json.isArchived ?? false,
+    fieldData: json.fieldData,
+  };
+}

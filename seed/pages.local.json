@@ -4,6 +4,8 @@
   "pages": [
     {
       "id": "seed-home",
+      "kind": "page",
+      "collectionId": null,
       "lastPublishedAt": "2026-08-20T09:00:00.000Z",
       "category": "plateformes",
       "visibleInSearch": true,
@@ -28,6 +30,8 @@
     },
     {
       "id": "seed-blog-post",
+      "kind": "page",
+      "collectionId": null,
       "lastPublishedAt": "2026-08-21T14:30:00.000Z",
       "category": "blog",
       "visibleInSearch": true,
@@ -52,6 +56,8 @@
     },
     {
       "id": "seed-docs",
+      "kind": "page",
+      "collectionId": null,
       "lastPublishedAt": "2026-08-22T11:15:00.000Z",
       "category": "documentation",
       "visibleInSearch": false,
@@ -69,6 +75,32 @@
           "publishedPath": "/en/documentation/getting-started",
           "webflowTitle": "Getting started | Documentation",
           "webflowMetaDescription": "Quick start guide.",
+          "title": null,
+          "summary": null
+        }
+      }
+    },
+    {
+      "id": "seed-cms-article",
+      "kind": "cms",
+      "collectionId": "seed-collection-blog",
+      "lastPublishedAt": "2026-08-23T10:00:00.000Z",
+      "category": "blog",
+      "visibleInSearch": true,
+      "locales": {
+        "locale-fr": {
+          "slug": "cms-exemple-article",
+          "publishedPath": "/blog/cms-exemple-article",
+          "webflowTitle": "Article CMS d'exemple",
+          "webflowMetaDescription": "Résumé de l'article CMS d'exemple, tiré d'un champ custom de la collection.",
+          "title": null,
+          "summary": null
+        },
+        "locale-en": {
+          "slug": "cms-example-article",
+          "publishedPath": "/en/blog/cms-example-article",
+          "webflowTitle": "Example CMS article",
+          "webflowMetaDescription": "Summary of the example CMS article, from a custom collection field.",
           "title": null,
           "summary": null
         }

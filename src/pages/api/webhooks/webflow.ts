@@ -1,9 +1,17 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { writePagesDoc } from "../../../lib/pagesStore";
-import { writeLocalesDoc } from "../../../lib/localesStore";
-import { getSiteLocales, listStaticPages, type WebflowPageSeo } from "../../../lib/webflowClient";
+import { writeLocalesDoc, readLocalesDoc, type LocaleInfo } from "../../../lib/localesStore";
+import {
+  getSiteLocales,
+  listStaticPages,
+  getCollectionPagePath,
+  getCollectionItem,
+  type WebflowPageSeo,
+  type WebflowCollectionItem,
+} from "../../../lib/webflowClient";
 import { resolveDefaultCategory } from "../../../config/categories";
+import { getCmsCollectionConfig } from "../../../config/cmsCollections";
 import { verifyWebflowSignature } from "../../../lib/webhookSignature";
 
 function json(status: number, body: unknown): Response {
@@ -13,37 +21,7 @@ function json(status: number, body: unknown): Response {
   });
 }
 
-export const POST: APIRoute = async ({ request }) => {
-  // Must read the raw body text (not request.json()) — the signature is an
-  // HMAC over these exact bytes, and re-serializing a parsed object could
-  // produce a different string (key order, whitespace) that fails to match.
-  const rawBody = await request.text();
-  const validSignature = await verifyWebflowSignature(
-    rawBody,
-    request.headers.get("x-webflow-timestamp"),
-    request.headers.get("x-webflow-signature"),
-    env.WEBFLOW_WEBHOOK_SECRET
-  );
-  if (!validSignature) {
-    return json(401, { error: "unauthorized" });
-  }
-
-  let body: unknown;
-  try {
-    body = JSON.parse(rawBody);
-  } catch {
-    return json(400, { error: "invalid_json" });
-  }
-  if (!body || typeof body !== "object") {
-    return json(400, { error: "invalid_json" });
-  }
-
-  const { triggerType, payload } = body as { triggerType?: string; payload?: { siteId?: string } };
-  if (triggerType !== "site_publish") {
-    return json(200, { skipped: true });
-  }
-
-  const siteId = payload?.siteId ?? env.WEBFLOW_SITE_ID;
+async function handleSitePublish(siteId: string | undefined): Promise<Response> {
   if (!siteId || siteId !== env.WEBFLOW_SITE_ID) {
     return json(403, { error: "site_mismatch" });
   }
@@ -95,6 +73,8 @@ export const POST: APIRoute = async ({ request }) => {
             .filter((x): x is { localeTag: string; slug: string } => x !== null);
           entry = {
             id: pageId,
+            kind: "page",
+            collectionId: null,
             lastPublishedAt: now,
             category: resolveDefaultCategory(slugsByLocale),
             visibleInSearch: true,
@@ -134,5 +114,157 @@ export const POST: APIRoute = async ({ request }) => {
     upserted: pageIds.size,
     total: doc.pages.length,
   });
-};
+}
 
+async function handleCollectionItemRemoved(itemId: string | undefined): Promise<Response> {
+  if (!itemId) return json(400, { error: "invalid_payload" });
+  const doc = await writePagesDoc(env.PAGES_BUCKET, (doc) => {
+    doc.pages = doc.pages.filter((p) => p.id !== itemId);
+    return doc;
+  });
+  return json(200, { ok: true, removed: itemId, total: doc.pages.length });
+}
+
+async function handleCollectionItemPublished(
+  itemId: string | undefined,
+  collectionId: string | undefined
+): Promise<Response> {
+  if (!itemId || !collectionId) return json(400, { error: "invalid_payload" });
+
+  const cmsConfig = getCmsCollectionConfig(collectionId);
+  if (!cmsConfig) return json(200, { skipped: true, reason: "collection_not_configured" });
+
+  const localesDoc = await readLocalesDoc(env.PAGES_BUCKET);
+  const locales: LocaleInfo[] = localesDoc.locales;
+
+  const itemsByLocale = new Map<string, WebflowCollectionItem | null>();
+  const templatePathByLocale = new Map<string, string | null>();
+  try {
+    for (const locale of locales) {
+      const localeId = locale.isPrimary ? undefined : locale.id;
+      itemsByLocale.set(
+        locale.id,
+        await getCollectionItem(collectionId, itemId, env.WEBFLOW_API_TOKEN, localeId)
+      );
+      templatePathByLocale.set(
+        locale.id,
+        await getCollectionPagePath(env.WEBFLOW_SITE_ID, collectionId, env.WEBFLOW_API_TOKEN, localeId)
+      );
+    }
+  } catch (err) {
+    return json(502, {
+      error: "webflow_api_error",
+      detail: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  // The item may be live in some locales and not yet translated/published in
+  // others, and a locale's Collection Page template may not exist yet (see
+  // getCollectionPagePath) — an item only counts as linkable if both are
+  // true for at least one locale. If not, there's nothing to point search
+  // results at, so treat this the same as an unpublish rather than writing
+  // an entry with no usable content in any locale.
+  const isLinkableSomewhere = locales.some((locale) => {
+    const item = itemsByLocale.get(locale.id);
+    return item && !item.isDraft && !item.isArchived && templatePathByLocale.get(locale.id);
+  });
+  if (!isLinkableSomewhere) {
+    return handleCollectionItemRemoved(itemId);
+  }
+
+  const now = new Date().toISOString();
+  let doc;
+  try {
+    doc = await writePagesDoc(env.PAGES_BUCKET, (doc) => {
+      let entry = doc.pages.find((p) => p.id === itemId);
+      if (!entry) {
+        entry = {
+          id: itemId,
+          kind: "cms",
+          collectionId,
+          lastPublishedAt: now,
+          category: cmsConfig.defaultCategory ?? null,
+          visibleInSearch: true,
+          locales: {},
+        };
+        doc.pages.push(entry);
+      } else {
+        entry.lastPublishedAt = now;
+      }
+
+      for (const locale of locales) {
+        const item = itemsByLocale.get(locale.id);
+        if (!item || item.isDraft || item.isArchived) continue;
+        // No page template synced for this collection/locale yet (e.g. the
+        // Collection Page was never actually built out in the Designer) —
+        // nothing to link to, skip rather than write a broken URL.
+        const templatePath = templatePathByLocale.get(locale.id);
+        if (!templatePath) continue;
+        const existing = entry.locales[locale.id];
+        const summary = cmsConfig.summaryField
+          ? String(item.fieldData[cmsConfig.summaryField] ?? "")
+          : "";
+        entry.locales[locale.id] = {
+          slug: item.slug,
+          publishedPath: `${templatePath}/${item.slug}`,
+          webflowTitle: item.name,
+          webflowMetaDescription: summary,
+          title: existing?.title ?? null,
+          summary: existing?.summary ?? null,
+        };
+      }
+      return doc;
+    });
+  } catch (err) {
+    return json(500, {
+      error: "pages_write_failed",
+      detail: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  return json(200, { ok: true, kind: "cms", id: itemId, total: doc.pages.length });
+}
+
+export const POST: APIRoute = async ({ request }) => {
+  // Must read the raw body text (not request.json()) — the signature is an
+  // HMAC over these exact bytes, and re-serializing a parsed object could
+  // produce a different string (key order, whitespace) that fails to match.
+  const rawBody = await request.text();
+  const secrets = (env.WEBFLOW_WEBHOOK_SECRETS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const validSignature = await verifyWebflowSignature(
+    rawBody,
+    request.headers.get("x-webflow-timestamp"),
+    request.headers.get("x-webflow-signature"),
+    secrets
+  );
+  if (!validSignature) {
+    return json(401, { error: "unauthorized" });
+  }
+
+  let body: unknown;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return json(400, { error: "invalid_json" });
+  }
+  if (!body || typeof body !== "object") {
+    return json(400, { error: "invalid_json" });
+  }
+
+  const { triggerType, payload } = body as {
+    triggerType?: string;
+    payload?: { siteId?: string; id?: string; collectionId?: string };
+  };
+
+  switch (triggerType) {
+    case "site_publish":
+      return handleSitePublish(payload?.siteId);
+    case "collection_item_published":
+      return handleCollectionItemPublished(payload?.id, payload?.collectionId);
+    case "collection_item_unpublished":
+    case "collection_item_deleted":
+      return handleCollectionItemRemoved(payload?.id);
+    default:
+      return json(200, { skipped: true });
+  }
+};
