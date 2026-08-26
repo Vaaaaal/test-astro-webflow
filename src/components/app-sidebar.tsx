@@ -1,5 +1,5 @@
 import * as React from "react";
-import { SearchIcon, UsersIcon, TagIcon, DatabaseIcon, TerminalIcon } from "lucide-react";
+import { TerminalIcon } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
@@ -12,6 +12,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { ADMIN_NAV_ITEMS } from "@/config/adminNav";
 import { roleAtLeast, type Role } from "@/config/roles";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -21,18 +22,13 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 }
 
 export function AppSidebar({ base, currentPath, user, ...props }: AppSidebarProps) {
-  const isAdmin = roleAtLeast(user.role, "admin");
-
-  const navMain = [
-    { title: "Contenu de recherche", url: `${base}/admin`, icon: <SearchIcon /> },
-    ...(isAdmin
-      ? [
-          { title: "Utilisateurs", url: `${base}/admin/users`, icon: <UsersIcon /> },
-          { title: "Catégories", url: `${base}/admin/categories`, icon: <TagIcon /> },
-          { title: "Collections CMS", url: `${base}/admin/collections`, icon: <DatabaseIcon /> },
-        ]
-      : []),
-  ];
+  const navMain = ADMIN_NAV_ITEMS.filter(
+    (item) => !item.minRole || roleAtLeast(user.role, item.minRole)
+  ).map((item) => ({
+    title: item.title,
+    url: `${base}${item.path}`,
+    icon: <item.icon />,
+  }));
 
   return (
     <Sidebar variant="inset" {...props}>
