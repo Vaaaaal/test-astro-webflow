@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { AddUserDialog } from "./AddUserDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { STICKY_ACTIONS_CELL_CLASS, STICKY_ACTIONS_HEAD_CLASS } from "@/lib/utils";
 
 interface UsersAdminProps {
   base: string;
@@ -132,7 +133,7 @@ export default function UsersAdmin({ base, currentUserEmail, currentUserRole }: 
                 <TableHead>Rôle</TableHead>
                 <TableHead>Ajouté par</TableHead>
                 <TableHead>Créé le</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className={STICKY_ACTIONS_HEAD_CLASS}>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -175,7 +176,7 @@ export default function UsersAdmin({ base, currentUserEmail, currentUserRole }: 
                     <TableCell className="text-muted-foreground">
                       {new Date(user.createdAt).toLocaleDateString()}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className={STICKY_ACTIONS_CELL_CLASS}>
                       <Button
                         variant="outline"
                         size="sm"

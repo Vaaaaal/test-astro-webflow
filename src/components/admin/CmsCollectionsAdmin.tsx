@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { CmsCollectionDialog } from "./CmsCollectionDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { STICKY_ACTIONS_CELL_CLASS, STICKY_ACTIONS_HEAD_CLASS } from "@/lib/utils";
 
 interface CmsCollectionsAdminProps {
   base: string;
@@ -125,7 +126,7 @@ export default function CmsCollectionsAdmin({ base }: CmsCollectionsAdminProps) 
             <TableHead>Statut</TableHead>
             <TableHead>Champ résumé</TableHead>
             <TableHead>Catégorie par défaut</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className={STICKY_ACTIONS_HEAD_CLASS}>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -152,7 +153,7 @@ export default function CmsCollectionsAdmin({ base }: CmsCollectionsAdminProps) 
                     : "—"}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{category?.adminLabel ?? "—"}</TableCell>
-                <TableCell className="text-right">
+                <TableCell className={STICKY_ACTIONS_CELL_CLASS}>
                   <div className="flex justify-end gap-2">
                     <CmsCollectionDialog
                       base={base}

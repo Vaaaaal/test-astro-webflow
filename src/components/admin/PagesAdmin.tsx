@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { STICKY_ACTIONS_CELL_CLASS, STICKY_ACTIONS_HEAD_CLASS } from "@/lib/utils";
 import { EditPageDialog } from "./EditPageDialog";
 
 interface PagesAdminProps {
@@ -254,7 +255,7 @@ export default function PagesAdmin({ base }: PagesAdminProps) {
             <TableHead>Catégorie</TableHead>
             <TableHead>Dernière publication</TableHead>
             <TableHead>Visible</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className={STICKY_ACTIONS_HEAD_CLASS}>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -308,7 +309,7 @@ export default function PagesAdmin({ base }: PagesAdminProps) {
                     }
                   />
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className={STICKY_ACTIONS_CELL_CLASS}>
                   <Button variant="outline" size="sm" onClick={() => setEditingId(page.id)}>
                     Modifier
                   </Button>
