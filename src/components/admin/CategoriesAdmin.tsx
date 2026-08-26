@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CategoryDialog } from "./CategoryDialog";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 interface CategoriesAdminProps {
   base: string;
@@ -23,6 +24,7 @@ export default function CategoriesAdmin({ base }: CategoriesAdminProps) {
   const [pages, setPages] = useState<PageEntry[]>([]);
   const [locales, setLocales] = useState<LocaleInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<CategoryEntry | null>(null);
 
   function load() {
     setError(null);
@@ -63,13 +65,6 @@ export default function CategoriesAdmin({ base }: CategoriesAdminProps) {
   }
 
   async function handleDelete(entry: CategoryEntry) {
-    const usageCount = pages.filter((p) => p.category === entry.key).length;
-    const confirmMessage =
-      usageCount > 0
-        ? `Supprimer "${entry.adminLabel}" ? ${usageCount} page(s) l'utilisent actuellement et repasseront à "aucune catégorie".`
-        : `Supprimer "${entry.adminLabel}" ?`;
-    if (!window.confirm(confirmMessage)) return;
-
     const previous = categories;
     setCategories((prev) => prev?.filter((c) => c.key !== entry.key) ?? prev);
     try {
@@ -137,7 +132,7 @@ export default function CategoriesAdmin({ base }: CategoriesAdminProps) {
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <CategoryDialog base={base} entry={category} locales={locales} onSaved={handleSaved} />
-                      <Button variant="outline" size="sm" onClick={() => handleDelete(category)}>
+                      <Button variant="outline" size="sm" onClick={() => setPendingDelete(category)}>
                         Supprimer
                       </Button>
                     </div>
@@ -148,6 +143,29 @@ export default function CategoriesAdmin({ base }: CategoriesAdminProps) {
           </Table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        title="Supprimer la catégorie"
+        description={
+          pendingDelete
+            ? (() => {
+                const usageCount = pages.filter((p) => p.category === pendingDelete.key).length;
+                return usageCount > 0
+                  ? `Supprimer "${pendingDelete.adminLabel}" ? ${usageCount} page(s) l'utilisent actuellement et repasseront à "aucune catégorie".`
+                  : `Supprimer "${pendingDelete.adminLabel}" ?`;
+              })()
+            : ""
+        }
+        confirmLabel="Supprimer"
+        onConfirm={() => {
+          if (pendingDelete) handleDelete(pendingDelete);
+          setPendingDelete(null);
+        }}
+      />
     </div>
   );
 }

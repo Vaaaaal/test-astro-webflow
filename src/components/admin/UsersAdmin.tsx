@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AddUserDialog } from "./AddUserDialog";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 interface UsersAdminProps {
   base: string;
@@ -35,6 +36,7 @@ export default function UsersAdmin({ base, currentUserEmail, currentUserRole }: 
   const [users, setUsers] = useState<UserEntry[] | null>(null);
   const [bootstrapSuperAdmins, setBootstrapSuperAdmins] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<UserEntry | null>(null);
 
   function loadUsers() {
     setError(null);
@@ -76,7 +78,6 @@ export default function UsersAdmin({ base, currentUserEmail, currentUserRole }: 
   }
 
   async function handleDelete(user: UserEntry) {
-    if (!window.confirm(`Supprimer l'accès de ${user.email} ?`)) return;
     const previous = users;
     setUsers((prev) => prev?.filter((u) => u.email !== user.email) ?? prev);
     try {
@@ -186,7 +187,7 @@ export default function UsersAdmin({ base, currentUserEmail, currentUserRole }: 
                               ? "Vous ne pouvez pas gérer ce compte"
                               : undefined
                         }
-                        onClick={() => handleDelete(user)}
+                        onClick={() => setPendingDelete(user)}
                       >
                         Supprimer
                       </Button>
@@ -215,6 +216,22 @@ export default function UsersAdmin({ base, currentUserEmail, currentUserRole }: 
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        title="Supprimer l'accès"
+        description={
+          pendingDelete ? `Supprimer l'accès de ${pendingDelete.email} ?` : ""
+        }
+        confirmLabel="Supprimer"
+        onConfirm={() => {
+          if (pendingDelete) handleDelete(pendingDelete);
+          setPendingDelete(null);
+        }}
+      />
     </div>
   );
 }

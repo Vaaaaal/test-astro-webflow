@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CmsCollectionDialog } from "./CmsCollectionDialog";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 interface CmsCollectionsAdminProps {
   base: string;
@@ -33,6 +34,7 @@ export default function CmsCollectionsAdmin({ base }: CmsCollectionsAdminProps) 
   const [configured, setConfigured] = useState<CmsCollectionEntry[]>([]);
   const [categories, setCategories] = useState<CategoryEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<{ id: string; displayName: string } | null>(null);
 
   function load() {
     setError(null);
@@ -74,7 +76,6 @@ export default function CmsCollectionsAdmin({ base }: CmsCollectionsAdminProps) 
   }
 
   async function handleRemove(collectionId: string, displayName: string) {
-    if (!window.confirm(`Retirer "${displayName}" de la synchronisation ?`)) return;
     const previous = configured;
     setConfigured((prev) => prev.filter((c) => c.collectionId !== collectionId));
     try {
@@ -161,7 +162,11 @@ export default function CmsCollectionsAdmin({ base }: CmsCollectionsAdminProps) 
                       onSaved={handleSaved}
                     />
                     {entry && (
-                      <Button variant="outline" size="sm" onClick={() => handleRemove(wc.id, wc.displayName)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPendingRemove({ id: wc.id, displayName: wc.displayName })}
+                      >
                         Retirer
                       </Button>
                     )}
@@ -172,6 +177,22 @@ export default function CmsCollectionsAdmin({ base }: CmsCollectionsAdminProps) 
           })}
         </TableBody>
       </Table>
+
+      <ConfirmDialog
+        open={pendingRemove !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingRemove(null);
+        }}
+        title="Retirer la collection"
+        description={
+          pendingRemove ? `Retirer "${pendingRemove.displayName}" de la synchronisation ?` : ""
+        }
+        confirmLabel="Retirer"
+        onConfirm={() => {
+          if (pendingRemove) handleRemove(pendingRemove.id, pendingRemove.displayName);
+          setPendingRemove(null);
+        }}
+      />
     </div>
   );
 }
