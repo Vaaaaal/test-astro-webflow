@@ -34,3 +34,34 @@ export async function sendMagicLinkEmail(params: SendMagicLinkEmailParams): Prom
     throw new Error(`Resend send failed: ${res.status} ${body}`);
   }
 }
+
+export interface SendEmailChangeConfirmationParams {
+  apiKey: string;
+  from: string;
+  to: string;
+  currentEmail: string;
+  confirmUrl: string;
+}
+
+export async function sendEmailChangeConfirmationEmail(
+  params: SendEmailChangeConfirmationParams
+): Promise<void> {
+  const res = await fetch(RESEND_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${params.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: params.from,
+      to: [params.to],
+      subject: "Confirme ta nouvelle adresse email",
+      html: `<p>Confirme le changement d'adresse email de ton compte Minisearch (actuellement ${params.currentEmail}) vers cette adresse : <a href="${params.confirmUrl}">${params.confirmUrl}</a></p><p>Ce lien expire dans 15 minutes et ne peut être utilisé qu'une fois. Si tu n'es pas à l'origine de cette demande, ignore cet email.</p>`,
+      text: `Confirme le changement d'adresse email de ton compte Minisearch (actuellement ${params.currentEmail}) vers cette adresse : ${params.confirmUrl}\n\nCe lien expire dans 15 minutes et ne peut être utilisé qu'une fois. Si tu n'es pas à l'origine de cette demande, ignore cet email.`,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Resend send failed: ${res.status} ${body}`);
+  }
+}

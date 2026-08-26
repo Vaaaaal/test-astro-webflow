@@ -56,6 +56,14 @@ Connexion par **magic link** (email → lien de connexion à usage unique, sans 
 
 Envoi des emails via [Resend](https://resend.com).
 
+## Compte
+
+Chaque utilisateur connecté gère son propre profil depuis `/admin/account` (lien "Mon compte" dans le menu du profil, bas de la sidebar) : nom complet, photo de profil, adresse email — en libre-service, sans passer par un `admin`.
+
+Nom et photo sont stockés dans `profiles.json` (R2, `src/lib/profilesStore.ts`), **volontairement séparé** de `users.json` et sans aucun champ de rôle : ce store est purement descriptif et ne peut jamais accorder d'accès, y compris pour un `super_admin` bootstrap (accordé via `SUPER_ADMIN_EMAILS`, sans entrée dans `users.json`) qui édite son profil pour la première fois. La photo elle-même est un objet R2 dédié (`avatars/<email>`, servi par `GET /api/account/avatar/:email`), redimensionnée/compressée côté client avant l'envoi (256×256, WebP) — aucun traitement d'image côté Worker.
+
+Changer d'adresse email réutilise l'infrastructure du lien magique de connexion : un lien de confirmation est envoyé à la **nouvelle** adresse (`POST /api/account/request-email-change` → `GET /api/auth/confirm-email-change`, même TTL 15 min/usage unique que la connexion) — le changement n'est appliqué qu'après ce clic, jamais immédiatement, pour éviter qu'une session compromise permette de détourner un compte en le rattachant à une autre adresse. Cette route de confirmation n'exige **pas** de session active (contrairement au reste de `/api/account`) puisqu'elle est cliquée depuis la boîte mail de la nouvelle adresse, potentiellement sur un autre appareil. Un `super_admin` bootstrap ne peut pas changer son adresse ainsi : son accès dépend de `SUPER_ADMIN_EMAILS`, hors de portée du self-service — le formulaire l'indique plutôt que de le masquer.
+
 ## Checklist : cloner pour un nouveau site
 
 À faire à chaque nouveau clonage, avant le premier déploiement réel :
@@ -97,6 +105,7 @@ wrangler r2 object put <nom-du-bucket>/locales.json --file=./seed/locales.local.
 wrangler r2 object put <nom-du-bucket>/categories.json --file=./seed/categories.local.json --local
 wrangler r2 object put <nom-du-bucket>/cmsCollections.json --file=./seed/cmsCollections.local.json --local
 wrangler r2 object put <nom-du-bucket>/users.json --file=./seed/users.local.json --local
+wrangler r2 object put <nom-du-bucket>/profiles.json --file=./seed/profiles.local.json --local
 ```
 En dev, `POST /api/auth/request-magic-link` n'appelle jamais Resend — il renvoie `devMagicLinkUrl` directement dans la réponse JSON (et l'affiche dans le formulaire de connexion) pour tester sans compte email.
 
@@ -114,13 +123,14 @@ Puis ouvrir `http://localhost:4321/admin`.
 │   ├── locales.local.json       # langues d'exemple pour le dev local
 │   ├── categories.local.json    # catégories d'exemple pour le dev local
 │   ├── cmsCollections.local.json # config collections CMS d'exemple pour le dev local
-│   └── users.local.json         # comptes d'exemple pour le dev local
+│   ├── users.local.json         # comptes d'exemple pour le dev local
+│   └── profiles.local.json      # profils (nom/avatar) d'exemple pour le dev local
 ├── src/
 │   ├── config/
 │   │   ├── customFields.ts    # champs personnalisés déclarés en code — vide par défaut, à adapter par site
 │   │   └── roles.ts           # rôles + règles d'escalade (partagé serveur/UI)
 │   ├── components/
-│   │   ├── admin/             # PagesAdmin, EditPageDialog, UsersAdmin, AddUserDialog, CategoriesAdmin, CategoryDialog, CmsCollectionsAdmin, CmsCollectionDialog
+│   │   ├── admin/             # PagesAdmin, EditPageDialog, UsersAdmin, AddUserDialog, CategoriesAdmin, CategoryDialog, CmsCollectionsAdmin, CmsCollectionDialog, AccountSettings, ConfirmDialog, ResetButton
 │   │   ├── auth/               # LoginForm
 │   │   └── ui/                # composants shadcn/ui
 │   ├── env.d.ts                # types Astro.locals/session + secrets Cloudflare.Env
@@ -134,9 +144,11 @@ Puis ouvrir `http://localhost:4321/admin`.
 │   │   ├── categoriesStore.ts     # schéma + lecture/écriture R2 (categories.json) — taxonomie éditable en admin
 │   │   ├── cmsCollectionsStore.ts # schéma + lecture/écriture R2 (cmsCollections.json)
 │   │   ├── usersStore.ts          # schéma + lecture/écriture R2 (users.json)
-│   │   ├── auth.ts                 # résolution email → rôle (bootstrap + users.json)
-│   │   ├── authTokens.ts           # tokens magic-link à usage unique (KV)
+│   │   ├── profilesStore.ts       # schéma + lecture/écriture R2 (profiles.json) — nom/avatar, jamais de rôle
+│   │   ├── auth.ts                 # résolution email → rôle + profil (bootstrap + users.json + profiles.json)
+│   │   ├── authTokens.ts           # tokens magic-link + changement d'email à usage unique (KV)
 │   │   ├── resendClient.ts         # envoi d'email via Resend
+│   │   ├── resizeImage.ts         # redimensionnement avatar côté client (canvas)
 │   │   ├── webflowClient.ts       # client Webflow Data API v2
 │   │   └── utils.ts
 │   ├── pages/
@@ -144,11 +156,13 @@ Puis ouvrir `http://localhost:4321/admin`.
 │   │   │   ├── index.astro       # interface d'admin (contenu)
 │   │   │   ├── users/index.astro       # interface d'admin (utilisateurs)
 │   │   │   ├── categories/index.astro  # interface d'admin (catégories)
-│   │   │   └── collections/index.astro # interface d'admin (collections CMS)
+│   │   │   ├── collections/index.astro # interface d'admin (collections CMS)
+│   │   │   └── account/index.astro     # profil personnel (nom, avatar, email) — libre-service, tout rôle
 │   │   ├── login/
 │   │   │   └── index.astro    # connexion par magic link
 │   │   ├── api/
-│   │   │   ├── auth/               # request-magic-link, verify, logout
+│   │   │   ├── auth/               # request-magic-link, verify, logout, confirm-email-change
+│   │   │   ├── account/             # PATCH nom, POST/DELETE/GET avatar, POST request-email-change (self)
 │   │   │   ├── users/               # GET/POST liste, PATCH/DELETE un utilisateur
 │   │   │   ├── pages/               # GET liste / PATCH une page (avec localeId, customFields)
 │   │   │   ├── locales/             # GET liste des langues du site

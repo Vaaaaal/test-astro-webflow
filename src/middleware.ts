@@ -33,6 +33,7 @@ const PAGE_RULES: Rule[] = [
 ];
 
 const API_RULES: Rule[] = [
+  { prefix: "/api/account", minRole: "editor" },
   { prefix: "/api/users", minRole: "admin" },
   { prefix: "/api/pages", minRole: "editor" },
   { prefix: "/api/locales", minRole: "editor" },

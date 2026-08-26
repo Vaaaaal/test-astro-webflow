@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-08-26T00:00:00.000Z",
+  "profiles": [
+    {
+      "email": "admin@example.com",
+      "name": "Alex Admin",
+      "hasAvatar": false
+    }
+  ]
+}

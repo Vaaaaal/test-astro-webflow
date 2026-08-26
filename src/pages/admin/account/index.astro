@@ -1,0 +1,26 @@
+---
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import AccountSettings from "../../../components/admin/AccountSettings";
+
+const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "") || "";
+// Guaranteed by middleware (role >= editor) for anyone reaching this page.
+const user = Astro.locals.user!;
+
+const emailChanged = Astro.url.searchParams.get("emailChanged") === "1";
+const error = Astro.url.searchParams.get("error") ?? undefined;
+---
+
+<AdminLayout title="Mon compte">
+  <main class="mx-auto w-full max-w-2xl px-4 py-10">
+    <p class="mb-8 text-sm text-muted-foreground">
+      Gère ton nom, ta photo de profil et ton adresse email de connexion.
+    </p>
+    <AccountSettings
+      client:load
+      base={base}
+      initialUser={{ email: user.email, role: user.role, name: user.name, hasAvatar: user.hasAvatar }}
+      emailChanged={emailChanged}
+      error={error}
+    />
+  </main>
+</AdminLayout>

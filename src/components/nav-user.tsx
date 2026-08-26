@@ -2,6 +2,7 @@ import { useRef } from "react";
 import {
   Avatar,
   AvatarFallback,
+  AvatarImage,
 } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,13 +19,16 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import type { Role } from "@/config/roles";
-import { ChevronsUpDownIcon, LogOutIcon } from "lucide-react";
+import type { AuthenticatedUser } from "@/lib/auth";
+import { ChevronsUpDownIcon, LogOutIcon, UserCogIcon } from "lucide-react";
 
-export function NavUser({ base, email, role }: { base: string; email: string; role: Role }) {
+export function NavUser({ base, user }: { base: string; user: AuthenticatedUser }) {
   const { isMobile } = useSidebar();
   const logoutFormRef = useRef<HTMLFormElement>(null);
-  const initial = email.charAt(0).toUpperCase();
+  const initial = (user.name || user.email).charAt(0).toUpperCase();
+  const avatarSrc = user.hasAvatar ? `${base}/api/account/avatar/${encodeURIComponent(user.email)}` : undefined;
+  const primaryLine = user.name || user.email;
+  const secondaryLine = user.name ? user.email : user.role;
 
   return (
     <SidebarMenu>
@@ -39,11 +43,12 @@ export function NavUser({ base, email, role }: { base: string; email: string; ro
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
+                {avatarSrc && <AvatarImage src={avatarSrc} alt="" />}
                 <AvatarFallback className="rounded-lg">{initial}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{email}</span>
-                <span className="truncate text-xs text-sidebar-foreground/60">{role}</span>
+                <span className="truncate font-medium">{primaryLine}</span>
+                <span className="truncate text-xs text-sidebar-foreground/60">{secondaryLine}</span>
               </div>
               <ChevronsUpDownIcon className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -57,16 +62,25 @@ export function NavUser({ base, email, role }: { base: string; email: string; ro
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
+                  {avatarSrc && <AvatarImage src={avatarSrc} alt="" />}
                   <AvatarFallback className="rounded-lg">{initial}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{email}</span>
+                  <span className="truncate font-medium">{primaryLine}</span>
+                  {user.name && <span className="truncate text-xs text-muted-foreground">{user.email}</span>}
                   <Badge variant="outline" className="mt-0.5 w-fit text-[10px]">
-                    {role}
+                    {user.role}
                   </Badge>
                 </div>
               </div>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <a href={`${base}/admin/account`}>
+                <UserCogIcon />
+                Mon compte
+              </a>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => logoutFormRef.current?.requestSubmit()}>
               <LogOutIcon />

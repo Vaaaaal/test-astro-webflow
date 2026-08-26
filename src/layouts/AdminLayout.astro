@@ -2,6 +2,13 @@
 import Layout from "./Layout.astro";
 import { AdminShell } from "../components/AdminShell";
 
+interface Props {
+  // Overrides the breadcrumb title for pages not in ADMIN_NAV_ITEMS (e.g.
+  // /admin/account — a personal settings page, not a main sidebar section).
+  title?: string;
+}
+
+const { title } = Astro.props;
 const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "") || "";
 // Guaranteed non-null: this layout is only ever used under /admin, which
 // the middleware requires a logged-in user (role >= editor) to reach.
@@ -10,7 +17,7 @@ const currentPath = Astro.url.pathname;
 ---
 
 <Layout>
-  <AdminShell client:load base={base} currentPath={currentPath} user={user}>
+  <AdminShell client:load base={base} currentPath={currentPath} user={user} title={title}>
     <slot />
   </AdminShell>
 </Layout>

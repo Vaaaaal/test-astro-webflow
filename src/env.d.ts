@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-empty-interface */
 type Runtime = import("@astrojs/cloudflare").Runtime;
 type Role = import("./config/roles").Role;
+type AuthenticatedUser = import("./lib/auth").AuthenticatedUser;
 
 // NOTE: this file has no top-level import/export statement (only inline
 // `import(...)` type queries), so it's an ambient script, not a module —
@@ -11,7 +12,7 @@ type Role = import("./config/roles").Role;
 // namespace.
 declare namespace App {
   interface Locals extends Runtime {
-    user: { email: string; role: Role } | null;
+    user: AuthenticatedUser | null;
   }
   interface SessionData {
     userEmail: string;

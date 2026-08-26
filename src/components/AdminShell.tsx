@@ -4,12 +4,13 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/co
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ADMIN_NAV_ITEMS } from "@/config/adminNav";
-import type { Role } from "@/config/roles";
+import type { AuthenticatedUser } from "@/lib/auth";
 
 interface AdminShellProps {
   base: string;
   currentPath: string;
-  user: { email: string; role: Role };
+  user: AuthenticatedUser;
+  title?: string;
   children: ReactNode;
 }
 
@@ -17,8 +18,8 @@ interface AdminShellProps {
 // AppSidebar (collapse state, mobile sheet) — they must be one React tree,
 // so this mounts as a single client:load island wrapping the page content
 // (passed in as Astro slot content -> React children).
-export function AdminShell({ base, currentPath, user, children }: AdminShellProps) {
-  const currentTitle = ADMIN_NAV_ITEMS.find((item) => `${base}${item.path}` === currentPath)?.title;
+export function AdminShell({ base, currentPath, user, title, children }: AdminShellProps) {
+  const currentTitle = title ?? ADMIN_NAV_ITEMS.find((item) => `${base}${item.path}` === currentPath)?.title;
 
   return (
     <SidebarProvider>

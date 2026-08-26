@@ -12,12 +12,13 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { ADMIN_NAV_GROUPS } from "@/config/adminNav";
-import { roleAtLeast, type Role } from "@/config/roles";
+import { roleAtLeast } from "@/config/roles";
+import type { AuthenticatedUser } from "@/lib/auth";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   base: string;
   currentPath: string;
-  user: { email: string; role: Role };
+  user: AuthenticatedUser;
 }
 
 export function AppSidebar({ base, currentPath, user, ...props }: AppSidebarProps) {
@@ -51,7 +52,7 @@ export function AppSidebar({ base, currentPath, user, ...props }: AppSidebarProp
         ))}
       </SidebarContent>
       <SidebarFooter>
-        <NavUser base={base} email={user.email} role={user.role} />
+        <NavUser base={base} user={user} />
       </SidebarFooter>
     </Sidebar>
   );

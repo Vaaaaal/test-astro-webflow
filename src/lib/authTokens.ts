@@ -45,3 +45,41 @@ export async function consumeMagicLinkToken(kv: KVNamespace, token: string): Pro
     return null;
   }
 }
+
+const EMAIL_CHANGE_KEY_PREFIX = "email-change:";
+
+interface EmailChangePayload {
+  currentEmail: string;
+  newEmail: string;
+  createdAt: string;
+}
+
+export async function createEmailChangeToken(
+  kv: KVNamespace,
+  currentEmail: string,
+  newEmail: string
+): Promise<string> {
+  const token = generateToken();
+  const payload: EmailChangePayload = { currentEmail, newEmail, createdAt: new Date().toISOString() };
+  await kv.put(EMAIL_CHANGE_KEY_PREFIX + token, JSON.stringify(payload), {
+    expirationTtl: TOKEN_TTL_SECONDS,
+  });
+  return token;
+}
+
+/** Single-use: get then delete, same residual race caveat as consumeMagicLinkToken. */
+export async function consumeEmailChangeToken(
+  kv: KVNamespace,
+  token: string
+): Promise<{ currentEmail: string; newEmail: string } | null> {
+  const key = EMAIL_CHANGE_KEY_PREFIX + token;
+  const raw = await kv.get(key);
+  if (!raw) return null;
+  await kv.delete(key);
+  try {
+    const payload = JSON.parse(raw) as EmailChangePayload;
+    return { currentEmail: payload.currentEmail, newEmail: payload.newEmail };
+  } catch {
+    return null;
+  }
+}
