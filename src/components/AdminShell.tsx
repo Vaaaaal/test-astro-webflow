@@ -22,9 +22,16 @@ export function AdminShell({ base, currentPath, user, title, children }: AdminSh
   const currentTitle = title ?? ADMIN_NAV_ITEMS.find((item) => `${base}${item.path}` === currentPath)?.title;
 
   return (
-    <SidebarProvider>
+    // dark here (not just on AppSidebar) is what makes the SidebarProvider
+    // wrapper's own "inset variant" gap background pick up the dark sidebar
+    // color instead of leaking the light one — and it's also what lets
+    // text-sidebar-foreground (set on the sidebar's true outer root, inside
+    // AppSidebar) resolve to the dark value in the first place, since color
+    // is fixed at the ancestor that sets it and just inherits from there.
+    // SidebarInset counters back to light immediately below.
+    <SidebarProvider className="dark">
       <AppSidebar base={base} currentPath={currentPath} user={user} />
-      <SidebarInset>
+      <SidebarInset className="light">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           {/* self-stretch (the Separator default for vertical orientation) can't

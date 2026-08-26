@@ -30,7 +30,12 @@ export function AppSidebar({ base, currentPath, user, ...props }: AppSidebarProp
   })).filter((group) => group.items.length > 0);
 
   return (
-    <Sidebar variant="inset" {...props}>
+    // className="dark" here is redundant with AdminShell's SidebarProvider
+    // on desktop (already an ancestor), but it's the only thing that reaches
+    // the mobile drawer: that variant renders through a Sheet portal, which
+    // teleports its DOM near <body> and breaks React-tree-based inheritance
+    // from any ancestor .dark — it needs its own, explicit here.
+    <Sidebar variant="inset" className="dark" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
