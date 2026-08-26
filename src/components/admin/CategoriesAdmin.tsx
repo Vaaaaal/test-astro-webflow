@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { CategoryDialog } from "./CategoryDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { STICKY_ACTIONS_CELL_CLASS, STICKY_ACTIONS_HEAD_CLASS } from "@/lib/utils";
 
 interface CategoriesAdminProps {
   base: string;
@@ -115,7 +116,7 @@ export default function CategoriesAdmin({ base }: CategoriesAdminProps) {
                 <TableHead>Libellé admin</TableHead>
                 <TableHead>Préfixe par défaut</TableHead>
                 <TableHead>Pages</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className={STICKY_ACTIONS_HEAD_CLASS}>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -129,7 +130,7 @@ export default function CategoriesAdmin({ base }: CategoriesAdminProps) {
                   <TableCell className="text-muted-foreground">
                     {pages.filter((p) => p.category === category.key).length}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className={STICKY_ACTIONS_CELL_CLASS}>
                     <div className="flex justify-end gap-2">
                       <CategoryDialog base={base} entry={category} locales={locales} onSaved={handleSaved} />
                       <Button variant="outline" size="sm" onClick={() => setPendingDelete(category)}>
