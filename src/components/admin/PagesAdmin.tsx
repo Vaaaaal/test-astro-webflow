@@ -5,6 +5,7 @@ import type { LocaleInfo } from "@/lib/localesStore";
 import { CATEGORY_ADMIN_LABELS } from "@/config/categories";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
   Table,
@@ -25,6 +26,7 @@ export default function PagesAdmin({ base }: PagesAdminProps) {
   const [locales, setLocales] = useState<LocaleInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   function loadPages() {
     setError(null);
@@ -102,8 +104,27 @@ export default function PagesAdmin({ base }: PagesAdminProps) {
 
   const editingEntry = pages.find((p) => p.id === editingId) ?? null;
 
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredPages = normalizedQuery
+    ? pages.filter((page) => {
+        const content = primaryLocale ? page.locales[primaryLocale.id] : undefined;
+        const haystack = [content?.publishedPath, content?.title, content?.webflowTitle]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(normalizedQuery);
+      })
+    : pages;
+
   return (
-    <div className="overflow-x-auto rounded-lg border">
+    <div className="flex flex-col gap-3">
+      <Input
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        placeholder="Rechercher par chemin ou par titre…"
+        className="max-w-sm"
+      />
+      <div className="overflow-x-auto rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -117,7 +138,14 @@ export default function PagesAdmin({ base }: PagesAdminProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {pages.map((page) => {
+          {filteredPages.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
+                Aucune page ne correspond à "{searchQuery}".
+              </TableCell>
+            </TableRow>
+          )}
+          {filteredPages.map((page) => {
             const content = primaryLocale ? page.locales[primaryLocale.id] : undefined;
             return (
               <TableRow key={page.id} className={page.visibleInSearch ? undefined : "opacity-60"}>
@@ -163,6 +191,7 @@ export default function PagesAdmin({ base }: PagesAdminProps) {
           })}
         </TableBody>
       </Table>
+      </div>
 
       <EditPageDialog
         entry={editingEntry}
