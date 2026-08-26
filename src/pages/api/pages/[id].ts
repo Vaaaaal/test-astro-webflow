@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { readPagesDoc, writePagesDoc, type PageEntry } from "../../../lib/pagesStore";
 import { readCategoriesDoc } from "../../../lib/categoriesStore";
 import { getCustomFieldConfig } from "../../../config/customFields";
+import { recordActivity } from "../../../lib/activityLogStore";
 
 const EDITABLE_KEYS = [
   "localeId",
@@ -22,7 +23,7 @@ function json(status: number, body: unknown): Response {
   });
 }
 
-export const PATCH: APIRoute = async ({ params, request }) => {
+export const PATCH: APIRoute = async ({ params, request, locals }) => {
   const id = params.id;
   if (!id) {
     return json(400, { error: "missing_id" });
@@ -136,5 +137,15 @@ export const PATCH: APIRoute = async ({ params, request }) => {
   if (!updated) {
     return json(404, { error: "not_found" });
   }
+
+  const targetLabel = Object.values(existingEntry.locales)[0]?.publishedPath ?? id;
+  await recordActivity(env.PAGES_BUCKET, {
+    actorEmail: locals.user!.email,
+    action: "page.updated",
+    targetId: id,
+    targetLabel,
+    details: { fields: Object.keys(patch).filter((k) => k !== "localeId") },
+  });
+
   return json(200, { ok: true, entry: updated });
 };

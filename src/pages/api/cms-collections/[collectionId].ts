@@ -6,6 +6,7 @@ import {
   type CmsCollectionEntry,
 } from "../../../lib/cmsCollectionsStore";
 import { readCategoriesDoc } from "../../../lib/categoriesStore";
+import { recordActivity } from "../../../lib/activityLogStore";
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -14,7 +15,7 @@ function json(status: number, body: unknown): Response {
   });
 }
 
-export const PATCH: APIRoute = async ({ params, request }) => {
+export const PATCH: APIRoute = async ({ params, request, locals }) => {
   const collectionId = params.collectionId;
   if (!collectionId) return json(400, { error: "missing_collection_id" });
 
@@ -61,10 +62,18 @@ export const PATCH: APIRoute = async ({ params, request }) => {
   });
 
   if (!updated) return json(404, { error: "not_found" });
+
+  await recordActivity(env.PAGES_BUCKET, {
+    actorEmail: locals.user!.email,
+    action: "cms_collection.updated",
+    targetId: collectionId,
+    targetLabel: collectionId,
+  });
+
   return json(200, { ok: true, entry: updated });
 };
 
-export const DELETE: APIRoute = async ({ params }) => {
+export const DELETE: APIRoute = async ({ params, locals }) => {
   const collectionId = params.collectionId;
   if (!collectionId) return json(400, { error: "missing_collection_id" });
 
@@ -83,5 +92,12 @@ export const DELETE: APIRoute = async ({ params }) => {
   // synced are left untouched (removing them here would just have the
   // webhook recreate them on the item's next publish anyway; explicit
   // unpublish/delete in Webflow is the real removal path).
+  await recordActivity(env.PAGES_BUCKET, {
+    actorEmail: locals.user!.email,
+    action: "cms_collection.removed",
+    targetId: collectionId,
+    targetLabel: collectionId,
+  });
+
   return json(200, { ok: true });
 };

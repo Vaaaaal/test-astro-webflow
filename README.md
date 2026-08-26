@@ -64,6 +64,14 @@ Nom et photo sont stockés dans `profiles.json` (R2, `src/lib/profilesStore.ts`)
 
 Changer d'adresse email réutilise l'infrastructure du lien magique de connexion : un lien de confirmation est envoyé à la **nouvelle** adresse (`POST /api/account/request-email-change` → `GET /api/auth/confirm-email-change`, même TTL 15 min/usage unique que la connexion) — le changement n'est appliqué qu'après ce clic, jamais immédiatement, pour éviter qu'une session compromise permette de détourner un compte en le rattachant à une autre adresse. Cette route de confirmation n'exige **pas** de session active (contrairement au reste de `/api/account`) puisqu'elle est cliquée depuis la boîte mail de la nouvelle adresse, potentiellement sur un autre appareil. Un `super_admin` bootstrap ne peut pas changer son adresse ainsi : son accès dépend de `SUPER_ADMIN_EMAILS`, hors de portée du self-service — le formulaire l'indique plutôt que de le masquer.
 
+## Journal d'activité
+
+`/admin/activity` (réservé aux `admin`/`super_admin`) liste qui a fait quoi : édition de page (seule ou en masse), création/édition/suppression de catégorie, configuration/édition/retrait de collection CMS, ajout/changement de rôle/suppression d'utilisateur. Volontairement **hors périmètre** : les changements de profil personnel (`/admin/account`), les événements de connexion, et la synchronisation webhook Webflow (automatique, pas une action humaine).
+
+Contrairement à tous les autres stores de ce repo (des ensembles bornés d'entités "état courant", réécrits en entier à chaque modification), le journal est **non borné et append-only** — un seul document grossirait indéfiniment. Stocké à la place **un document R2 par mois** (`activity/2026-08.json`, `src/lib/activityLogStore.ts`) : seul le mois courant subit des écritures fréquentes, les mois précédents deviennent naturellement immuables une fois clos. L'écriture d'une entrée (`recordActivity`) est **best-effort** — appelée après que l'action principale a déjà réussi, une panne du journal ne fait jamais échouer la requête d'origine.
+
+Pas de rétention/purge automatique : l'historique reste disponible indéfiniment, mois par mois, sans Cron de nettoyage.
+
 ## Checklist : cloner pour un nouveau site
 
 À faire à chaque nouveau clonage, avant le premier déploiement réel :
@@ -106,6 +114,8 @@ wrangler r2 object put <nom-du-bucket>/categories.json --file=./seed/categories.
 wrangler r2 object put <nom-du-bucket>/cmsCollections.json --file=./seed/cmsCollections.local.json --local
 wrangler r2 object put <nom-du-bucket>/users.json --file=./seed/users.local.json --local
 wrangler r2 object put <nom-du-bucket>/profiles.json --file=./seed/profiles.local.json --local
+# La clé du journal d'activité est datée (activity/<AAAA-MM>.json) — adapter au mois courant :
+wrangler r2 object put <nom-du-bucket>/activity/$(date +%Y-%m).json --file=./seed/activity.local.json --local
 ```
 En dev, `POST /api/auth/request-magic-link` n'appelle jamais Resend — il renvoie `devMagicLinkUrl` directement dans la réponse JSON (et l'affiche dans le formulaire de connexion) pour tester sans compte email.
 
@@ -124,13 +134,14 @@ Puis ouvrir `http://localhost:4321/admin`.
 │   ├── categories.local.json    # catégories d'exemple pour le dev local
 │   ├── cmsCollections.local.json # config collections CMS d'exemple pour le dev local
 │   ├── users.local.json         # comptes d'exemple pour le dev local
-│   └── profiles.local.json      # profils (nom/avatar) d'exemple pour le dev local
+│   ├── profiles.local.json      # profils (nom/avatar) d'exemple pour le dev local
+│   └── activity.local.json      # entrées de journal d'exemple — clé R2 datée, voir section "Seed"
 ├── src/
 │   ├── config/
 │   │   ├── customFields.ts    # champs personnalisés déclarés en code — vide par défaut, à adapter par site
 │   │   └── roles.ts           # rôles + règles d'escalade (partagé serveur/UI)
 │   ├── components/
-│   │   ├── admin/             # PagesAdmin, EditPageDialog, UsersAdmin, AddUserDialog, CategoriesAdmin, CategoryDialog, CmsCollectionsAdmin, CmsCollectionDialog, AccountSettings, ConfirmDialog, ResetButton
+│   │   ├── admin/             # PagesAdmin, EditPageDialog, UsersAdmin, AddUserDialog, CategoriesAdmin, CategoryDialog, CmsCollectionsAdmin, CmsCollectionDialog, AccountSettings, ActivityLogAdmin, ConfirmDialog, ResetButton
 │   │   ├── auth/               # LoginForm
 │   │   └── ui/                # composants shadcn/ui
 │   ├── env.d.ts                # types Astro.locals/session + secrets Cloudflare.Env
@@ -145,6 +156,7 @@ Puis ouvrir `http://localhost:4321/admin`.
 │   │   ├── cmsCollectionsStore.ts # schéma + lecture/écriture R2 (cmsCollections.json)
 │   │   ├── usersStore.ts          # schéma + lecture/écriture R2 (users.json)
 │   │   ├── profilesStore.ts       # schéma + lecture/écriture R2 (profiles.json) — nom/avatar, jamais de rôle
+│   │   ├── activityLogStore.ts    # schéma + lecture/écriture R2 (activity/<mois>.json), append-only par mois
 │   │   ├── auth.ts                 # résolution email → rôle + profil (bootstrap + users.json + profiles.json)
 │   │   ├── authTokens.ts           # tokens magic-link + changement d'email à usage unique (KV)
 │   │   ├── resendClient.ts         # envoi d'email via Resend
@@ -157,7 +169,8 @@ Puis ouvrir `http://localhost:4321/admin`.
 │   │   │   ├── users/index.astro       # interface d'admin (utilisateurs)
 │   │   │   ├── categories/index.astro  # interface d'admin (catégories)
 │   │   │   ├── collections/index.astro # interface d'admin (collections CMS)
-│   │   │   └── account/index.astro     # profil personnel (nom, avatar, email) — libre-service, tout rôle
+│   │   │   ├── account/index.astro     # profil personnel (nom, avatar, email) — libre-service, tout rôle
+│   │   │   └── activity/index.astro    # journal d'activité (admin/super_admin)
 │   │   ├── login/
 │   │   │   └── index.astro    # connexion par magic link
 │   │   ├── api/
@@ -169,6 +182,7 @@ Puis ouvrir `http://localhost:4321/admin`.
 │   │   │   ├── categories/          # GET/POST liste, PATCH/DELETE une catégorie
 │   │   │   ├── cms-collections/     # GET/POST liste, PATCH/DELETE une config de collection
 │   │   │   ├── webflow-collections/ # GET proxy live vers les collections Webflow du site
+│   │   │   ├── activity/            # GET journal d'activité, filtrable par mois/utilisateur
 │   │   │   ├── search-index/       # GET public, index de recherche pour le widget externe
 │   │   │   └── webhooks/
 │   │   │       └── webflow.ts      # récepteur webhook Webflow

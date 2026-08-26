@@ -9,6 +9,7 @@ import {
   type Role,
 } from "../../../config/roles";
 import { findUser, readUsersDoc, writeUsersDoc } from "../../../lib/usersStore";
+import { recordActivity } from "../../../lib/activityLogStore";
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -60,6 +61,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
       createdAt: new Date().toISOString(),
     });
     return doc;
+  });
+
+  await recordActivity(env.PAGES_BUCKET, {
+    actorEmail: actor.email,
+    action: "user.invited",
+    targetId: email,
+    targetLabel: email,
+    details: { role },
   });
 
   return json(201, { ok: true, entry: findUser(doc, email) });

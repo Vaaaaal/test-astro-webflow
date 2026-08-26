@@ -1,4 +1,4 @@
-import { DatabaseIcon, SearchIcon, TagIcon, UsersIcon, type LucideIcon } from "lucide-react";
+import { DatabaseIcon, HistoryIcon, SearchIcon, TagIcon, UsersIcon, type LucideIcon } from "lucide-react";
 import type { Role } from "@/config/roles";
 
 export interface AdminNavItem {
@@ -26,6 +26,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { title: "Utilisateurs", path: "/admin/users", icon: UsersIcon, minRole: "admin" },
       { title: "Catégories", path: "/admin/categories", icon: TagIcon, minRole: "admin" },
       { title: "Collections CMS", path: "/admin/collections", icon: DatabaseIcon, minRole: "admin" },
+      { title: "Journal d'activité", path: "/admin/activity", icon: HistoryIcon, minRole: "admin" },
     ],
   },
 ];

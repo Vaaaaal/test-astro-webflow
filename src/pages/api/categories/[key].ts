@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { readCategoriesDoc, writeCategoriesDoc, type CategoryEntry } from "../../../lib/categoriesStore";
 import { writePagesDoc } from "../../../lib/pagesStore";
+import { recordActivity } from "../../../lib/activityLogStore";
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -15,7 +16,7 @@ function isStringRecord(value: unknown): value is Record<string, string> {
   return Object.values(value).every((v) => typeof v === "string");
 }
 
-export const PATCH: APIRoute = async ({ params, request }) => {
+export const PATCH: APIRoute = async ({ params, request, locals }) => {
   const key = params.key;
   if (!key) return json(400, { error: "missing_key" });
 
@@ -40,7 +41,8 @@ export const PATCH: APIRoute = async ({ params, request }) => {
   }
 
   const { doc: existingDoc } = await readCategoriesDoc(env.PAGES_BUCKET);
-  if (!existingDoc.categories.some((c) => c.key === key)) {
+  const existingCategory = existingDoc.categories.find((c) => c.key === key);
+  if (!existingCategory) {
     return json(404, { error: "not_found" });
   }
 
@@ -57,15 +59,24 @@ export const PATCH: APIRoute = async ({ params, request }) => {
   });
 
   if (!updated) return json(404, { error: "not_found" });
+
+  await recordActivity(env.PAGES_BUCKET, {
+    actorEmail: locals.user!.email,
+    action: "category.updated",
+    targetId: key,
+    targetLabel: typeof adminLabel === "string" ? adminLabel : existingCategory.adminLabel,
+  });
+
   return json(200, { ok: true, entry: updated });
 };
 
-export const DELETE: APIRoute = async ({ params }) => {
+export const DELETE: APIRoute = async ({ params, locals }) => {
   const key = params.key;
   if (!key) return json(400, { error: "missing_key" });
 
   const { doc: existingDoc } = await readCategoriesDoc(env.PAGES_BUCKET);
-  if (!existingDoc.categories.some((c) => c.key === key)) {
+  const existingCategory = existingDoc.categories.find((c) => c.key === key);
+  if (!existingCategory) {
     return json(404, { error: "not_found" });
   }
 
@@ -86,6 +97,14 @@ export const DELETE: APIRoute = async ({ params }) => {
       }
     }
     return doc;
+  });
+
+  await recordActivity(env.PAGES_BUCKET, {
+    actorEmail: locals.user!.email,
+    action: "category.deleted",
+    targetId: key,
+    targetLabel: existingCategory.adminLabel,
+    details: { clearedPages: clearedCount },
   });
 
   return json(200, { ok: true, clearedPages: clearedCount });

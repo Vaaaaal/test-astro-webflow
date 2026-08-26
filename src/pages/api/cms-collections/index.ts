@@ -6,6 +6,7 @@ import {
   type CmsCollectionEntry,
 } from "../../../lib/cmsCollectionsStore";
 import { readCategoriesDoc } from "../../../lib/categoriesStore";
+import { recordActivity } from "../../../lib/activityLogStore";
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -19,7 +20,7 @@ export const GET: APIRoute = async () => {
   return json(200, doc.collections);
 };
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {
     return json(400, { error: "invalid_json" });
@@ -64,6 +65,13 @@ export const POST: APIRoute = async ({ request }) => {
   const doc = await writeCmsCollectionsDoc(env.PAGES_BUCKET, (doc) => {
     doc.collections.push(entry);
     return doc;
+  });
+
+  await recordActivity(env.PAGES_BUCKET, {
+    actorEmail: locals.user!.email,
+    action: "cms_collection.configured",
+    targetId: collectionId,
+    targetLabel: collectionId,
   });
 
   return json(201, {

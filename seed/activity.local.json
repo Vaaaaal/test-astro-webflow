@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-08-26T09:00:00.000Z",
+  "entries": [
+    {
+      "id": "seed-activity-1",
+      "timestamp": "2026-08-25T09:00:00.000Z",
+      "actorEmail": "admin@example.com",
+      "action": "page.updated",
+      "targetId": "seed-home",
+      "targetLabel": "/",
+      "details": { "fields": ["title", "summary"] }
+    },
+    {
+      "id": "seed-activity-2",
+      "timestamp": "2026-08-25T10:30:00.000Z",
+      "actorEmail": "hey@vaaal.fr",
+      "action": "user.role_changed",
+      "targetId": "editor@example.com",
+      "targetLabel": "editor@example.com",
+      "details": { "from": "editor", "to": "admin" }
+    },
+    {
+      "id": "seed-activity-3",
+      "timestamp": "2026-08-26T08:15:00.000Z",
+      "actorEmail": "admin@example.com",
+      "action": "category.created",
+      "targetId": "guides",
+      "targetLabel": "Guides"
+    }
+  ]
+}

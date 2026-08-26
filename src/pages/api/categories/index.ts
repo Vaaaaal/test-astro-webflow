@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { readCategoriesDoc, writeCategoriesDoc, type CategoryEntry } from "../../../lib/categoriesStore";
+import { recordActivity } from "../../../lib/activityLogStore";
 
 const KEY_PATTERN = /^[a-z0-9-]+$/;
 
@@ -21,7 +22,7 @@ export const GET: APIRoute = async () => {
   return json(200, doc.categories);
 };
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {
     return json(400, { error: "invalid_json" });
@@ -61,6 +62,13 @@ export const POST: APIRoute = async ({ request }) => {
   const doc = await writeCategoriesDoc(env.PAGES_BUCKET, (doc) => {
     doc.categories.push(entry);
     return doc;
+  });
+
+  await recordActivity(env.PAGES_BUCKET, {
+    actorEmail: locals.user!.email,
+    action: "category.created",
+    targetId: key,
+    targetLabel: adminLabel,
   });
 
   return json(201, { ok: true, entry: doc.categories.find((c) => c.key === key) });

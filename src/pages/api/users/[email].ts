@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { ROLES, canManageUserWithRole, normalizeEmail, type Role } from "../../../config/roles";
 import { findUser, readUsersDoc, writeUsersDoc, type UserEntry } from "../../../lib/usersStore";
+import { recordActivity } from "../../../lib/activityLogStore";
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -48,6 +49,15 @@ export const PATCH: APIRoute = async ({ params, request, locals }) => {
   });
 
   if (!updated) return json(404, { error: "not_found" });
+
+  await recordActivity(env.PAGES_BUCKET, {
+    actorEmail: actor.email,
+    action: "user.role_changed",
+    targetId: targetEmail,
+    targetLabel: targetEmail,
+    details: { from: existing.role, to: role },
+  });
+
   return json(200, { ok: true, entry: updated });
 };
 
@@ -73,6 +83,13 @@ export const DELETE: APIRoute = async ({ params, locals }) => {
   await writeUsersDoc(env.PAGES_BUCKET, (doc) => {
     doc.users = doc.users.filter((u) => u.email !== targetEmail);
     return doc;
+  });
+
+  await recordActivity(env.PAGES_BUCKET, {
+    actorEmail: actor.email,
+    action: "user.access_removed",
+    targetId: targetEmail,
+    targetLabel: targetEmail,
   });
 
   return json(200, { ok: true });

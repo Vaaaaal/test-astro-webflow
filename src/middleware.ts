@@ -29,6 +29,7 @@ const PAGE_RULES: Rule[] = [
   { prefix: "/admin/users", minRole: "admin" },
   { prefix: "/admin/categories", minRole: "admin" },
   { prefix: "/admin/collections", minRole: "admin" },
+  { prefix: "/admin/activity", minRole: "admin" },
   { prefix: "/admin", minRole: "editor" },
 ];
 
@@ -40,6 +41,7 @@ const API_RULES: Rule[] = [
   { prefix: "/api/categories", minRole: "editor", writeMinRole: "admin" },
   { prefix: "/api/cms-collections", minRole: "editor", writeMinRole: "admin" },
   { prefix: "/api/webflow-collections", minRole: "admin" },
+  { prefix: "/api/activity", minRole: "admin" },
 ];
 
 const READ_METHODS = new Set(["GET", "HEAD"]);

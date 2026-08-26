@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { readPagesDoc, writePagesDoc, type PageEntry } from "../../../lib/pagesStore";
 import { readCategoriesDoc } from "../../../lib/categoriesStore";
+import { recordActivity } from "../../../lib/activityLogStore";
 
 // Batch-editable subset of PATCH /api/pages/:id — only page-level fields
 // that make sense to set identically across many pages at once. Title/
@@ -16,7 +17,7 @@ function json(status: number, body: unknown): Response {
   });
 }
 
-export const PATCH: APIRoute = async ({ request }) => {
+export const PATCH: APIRoute = async ({ request, locals }) => {
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return json(400, { error: "invalid_json" });
@@ -70,6 +71,17 @@ export const PATCH: APIRoute = async ({ request }) => {
       updated.push(entry);
     }
     return doc;
+  });
+
+  await recordActivity(env.PAGES_BUCKET, {
+    actorEmail: locals.user!.email,
+    action: "pages.batch_updated",
+    targetId: uniqueIds.join(","),
+    targetLabel: `${updated.length} page${updated.length > 1 ? "s" : ""}`,
+    details: {
+      patch: typedPatch,
+      pages: updated.map((p) => ({ id: p.id, path: Object.values(p.locales)[0]?.publishedPath })),
+    },
   });
 
   return json(200, { ok: true, updated });
